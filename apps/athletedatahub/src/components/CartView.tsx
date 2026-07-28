@@ -5,11 +5,12 @@ import { Trash2, Plus, Minus, ShoppingBag } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { Button } from "@/components/ui/Button";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
-import { t, getLocale } from "@/lib/i18n";
+import { t } from "@/lib/i18n";
+import { useLocale } from "@/context/LocaleContext";
 
 export function CartView() {
   const { items, total, removeItem, updateQuantity } = useCart();
-  const locale = getLocale();
+  const { locale } = useLocale();
 
   const FREE_SHIPPING_THRESHOLD = locale === "fr" ? 50 : 50;
   const shippingFee = total >= FREE_SHIPPING_THRESHOLD ? 0 : locale === "fr" ? 5.99 : 6.99;
@@ -22,15 +23,15 @@ export function CartView() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <Breadcrumbs
           items={[
-            { label: t("home"), href: "/" },
-            { label: t("cart") },
+            { label: t("home", locale), href: "/" },
+            { label: t("cart", locale) },
           ]}
         />
         <div className="flex flex-col items-center justify-center py-24 gap-5">
           <ShoppingBag className="w-20 h-20 text-gray-300" />
-          <h2 className="text-2xl font-bold text-gray-700">{t("emptyCart")}</h2>
+          <h2 className="text-2xl font-bold text-gray-700">{t("emptyCart", locale)}</h2>
           <Link href="/catalog">
-            <Button size="lg">{t("continueShopping")}</Button>
+            <Button size="lg">{t("continueShopping", locale)}</Button>
           </Link>
         </div>
       </div>
@@ -41,12 +42,12 @@ export function CartView() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
       <Breadcrumbs
         items={[
-          { label: t("home"), href: "/" },
-          { label: t("cart") },
+          { label: t("home", locale), href: "/" },
+          { label: t("cart", locale) },
         ]}
       />
 
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">{t("yourCart")}</h1>
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">{t("yourCart", locale)}</h1>
 
       <div className="flex flex-col lg:flex-row gap-8">
         {/* Items */}
@@ -76,12 +77,12 @@ export function CartView() {
                   </Link>
                   {item.selectedVariant && (
                     <p className="text-xs text-gray-500 mt-0.5">
-                      {t("size")}: {item.selectedVariant}
+                      {t("size", locale)}: {item.selectedVariant}
                     </p>
                   )}
                   {item.selectedColor && (
                     <p className="text-xs text-gray-500">
-                      {t("color")}: {item.selectedColor}
+                      {t("color", locale)}: {item.selectedColor}
                     </p>
                   )}
                   <p className="text-blue-700 font-bold mt-1">
@@ -125,7 +126,7 @@ export function CartView() {
                 <button
                   onClick={() => removeItem(item.productId)}
                   className="p-2 text-gray-400 hover:text-red-600 transition-colors flex-shrink-0"
-                  aria-label={t("remove")}
+                  aria-label={t("remove", locale)}
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -136,7 +137,7 @@ export function CartView() {
           <div className="flex justify-between items-center pt-2">
             <Link href="/catalog">
               <Button variant="ghost" size="sm">
-                ← {t("continueShopping")}
+                ← {t("continueShopping", locale)}
               </Button>
             </Link>
           </div>
@@ -145,17 +146,17 @@ export function CartView() {
         {/* Summary */}
         <div className="w-full lg:w-80 flex-shrink-0">
           <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4 sticky top-20">
-            <h2 className="font-bold text-gray-900 text-lg">{t("orderSummary")}</h2>
+            <h2 className="font-bold text-gray-900 text-lg">{t("orderSummary", locale)}</h2>
 
             <div className="space-y-2 text-sm">
               <div className="flex justify-between text-gray-600">
-                <span>{t("subtotal")}</span>
+                <span>{t("subtotal", locale)}</span>
                 <span>{formatAmt(total)}</span>
               </div>
               <div className="flex justify-between text-gray-600">
-                <span>{t("shipping")}</span>
+                <span>{t("shipping", locale)}</span>
                 <span className={shippingFee === 0 ? "text-green-600 font-medium" : ""}>
-                  {shippingFee === 0 ? t("free") : formatAmt(shippingFee)}
+                  {shippingFee === 0 ? t("free", locale) : formatAmt(shippingFee)}
                 </span>
               </div>
               {shippingFee > 0 && (
@@ -168,13 +169,13 @@ export function CartView() {
             </div>
 
             <div className="border-t border-gray-100 pt-3 flex justify-between font-bold text-gray-900">
-              <span>{t("total")}</span>
+              <span>{t("total", locale)}</span>
               <span>{formatAmt(total + shippingFee)}</span>
             </div>
 
             <Link href="/checkout">
               <Button fullWidth size="lg">
-                {t("proceedToCheckout")}
+                {t("proceedToCheckout", locale)}
               </Button>
             </Link>
           </div>

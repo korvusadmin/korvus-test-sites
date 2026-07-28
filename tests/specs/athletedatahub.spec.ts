@@ -7,6 +7,41 @@ import { injectSnippet, getSiteConfig } from "../helpers/inject-snippet"
 
 const adh = getSiteConfig("athletedatahub")
 
+test.describe("ADH — bilingual storefront", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem("adh_cookie_consent", "declined")
+    })
+  })
+
+  test("French is the default and English persists across PLP and PDP navigation", async ({
+    page,
+  }) => {
+    await page.goto("/")
+
+    await expect(page.getByRole("heading", { name: "Allez plus loin. Équipez-vous juste." })).toBeVisible()
+    await expect(page.getByRole("banner").getByRole("link", { name: "Panier" })).toBeVisible()
+
+    await page.getByRole("button", { name: "Switch to English" }).click()
+    await expect(page.getByRole("heading", { name: "Go further. Gear up right." })).toBeVisible()
+    await expect(page.getByRole("banner").getByRole("link", { name: "Cart" })).toBeVisible()
+
+    await page.getByRole("link", { name: "Shop the collection" }).click()
+    await expect(page).toHaveURL(/\/catalog$/)
+    await expect(page.getByRole("heading", { name: "All the gear to go further" })).toBeVisible()
+
+    await page.getByRole("link", { name: "Openwater Flex 3/2", exact: true }).first().click()
+    await expect(page).toHaveURL(/\/products\/openwater-flex-3-2$/)
+    await expect(page.getByRole("heading", { name: "Openwater Flex 3/2" })).toBeVisible()
+    await expect(page.getByText("$389.90", { exact: true })).toBeVisible()
+    await expect(page.getByRole("button", { name: "Add to Cart" })).toBeVisible()
+
+    await page.reload()
+    await expect(page.getByRole("button", { name: "Passer en français" })).toBeVisible()
+    await expect(page.getByRole("heading", { name: "Openwater Flex 3/2" })).toBeVisible()
+  })
+})
+
 // Axeptio simulation — athletedatahub's CMP (window.__korvusCMP) is NOT detected by snippet
 async function simulateAxeptio(
   page: import("@playwright/test").Page,

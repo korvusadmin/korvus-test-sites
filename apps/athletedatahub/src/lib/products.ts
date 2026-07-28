@@ -34,5 +34,5 @@ export function getRelatedProducts(
 }
 
 export function getAllCategories(): Category[] {
-  return ["clothing", "equipment", "nutrition"];
+  return ["running", "trail", "triathlon", "cycling", "equipment", "nutrition"];
 }

@@ -6,19 +6,20 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { GTMPageView } from "@/components/GTMPageView";
 import { CookieBanner } from "@/components/CookieBanner";
+import { LocaleProvider } from "@/context/LocaleContext";
 
-const isFR = process.env.NEXT_PUBLIC_LOCALE === "FR";
+const isFR = process.env.NEXT_PUBLIC_LOCALE !== "EN";
 
 export const metadata: Metadata = {
   title: {
     default: isFR
-      ? "AthleteDataHub – Équipement Sport & Nutrition"
-      : "AthleteDataHub – Sports Gear & Nutrition",
+      ? "AthleteDataHub – Running, Trail & Triathlon"
+      : "AthleteDataHub – Running, Trail & Triathlon",
     template: "%s | AthleteDataHub",
   },
   description: isFR
-    ? "Vêtements, équipements et nutrition premium pour athlètes engagés."
-    : "Premium sports apparel, equipment, and nutrition for dedicated athletes.",
+    ? "Running, trail et triathlon : équipement, nutrition et conseils sélectionnés par des athlètes."
+    : "Expert-selected running, trail and triathlon gear, nutrition and advice.",
 };
 
 export default function RootLayout({
@@ -46,16 +47,18 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: `window.__korvus={websiteId:"${isFR ? "00000000-0000-4000-a000-000000001011" : "00000000-0000-4000-a000-000000001010"}",apiKey:"kv_test_0000000000000000000000000000000000000000000000000000000000000001",endpoint:"/api/ingest",platform:"custom"};` }} />
         <script src="/api/snippet/korvus.min.js" defer />
       </head>
-      <body className="min-h-screen flex flex-col bg-gray-50">
-        <CartProvider>
-          <Suspense fallback={null}>
-            <GTMPageView />
-          </Suspense>
-          <Header />
-          <main className="flex-1">{children}</main>
-          <Footer />
-          <CookieBanner />
-        </CartProvider>
+      <body className="min-h-screen flex flex-col bg-[#fafaf7] text-[#07111f]">
+        <LocaleProvider>
+          <CartProvider>
+            <Suspense fallback={null}>
+              <GTMPageView />
+            </Suspense>
+            <Header />
+            <main className="flex-1">{children}</main>
+            <Footer />
+            <CookieBanner />
+          </CartProvider>
+        </LocaleProvider>
       </body>
     </html>
   );
