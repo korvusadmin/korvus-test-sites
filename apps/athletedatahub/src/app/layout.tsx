@@ -44,8 +44,53 @@ export default function RootLayout({
           }}
         />
         {/* INJECT_SCRIPTS */}
-        <script dangerouslySetInnerHTML={{ __html: `window.__korvus={websiteId:"${isFR ? "00000000-0000-4000-a000-000000001011" : "00000000-0000-4000-a000-000000001010"}",apiKey:"kv_test_0000000000000000000000000000000000000000000000000000000000000001",endpoint:"/api/ingest",platform:"custom"};` }} />
-        <script src="/api/snippet/korvus.min.js" defer />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+var proofDiagnostic=new URLSearchParams(location.search).get("proof-diagnostic")==="1";
+if(proofDiagnostic){
+  window.Cookiebot={consent:{statistics:true}};
+  try{
+    sessionStorage.setItem("korvus_sid","435b8f99-e523-4b27-95ff-ead084fb2333");
+    if(!sessionStorage.getItem("korvus_sid_created_at")){
+      sessionStorage.setItem("korvus_sid_created_at",new Date().toISOString());
+    }
+  }catch(e){}
+  window.__korvus={
+    websiteId:"${isFR ? "00000000-0000-4000-a000-000000001011" : "00000000-0000-4000-a000-000000001010"}",
+    apiKey:"kv_test_0000000000000000000000000000000000000000000000000000000000000001",
+    endpoint:"https://app.korvus.fr/api/ingest",
+    platform:"custom",
+    enableProofCapture:true,
+    proofChunkUrl:"https://demo.korvus.fr/korvus-proof.min.js"
+  };
+  window.__proofProbe=[];
+  (function(){
+    var realFetch=window.fetch;
+    window.fetch=function(input,init){
+      try{
+        var url=typeof input==="string"?input:(input&&input.url)||"";
+        if(url.indexOf("/api/ingest/proof")!==-1&&init&&init.body){
+          window.__proofProbe.push({
+            navigateur_utc:new Date().toISOString(),
+            corps:init.body
+          });
+        }
+      }catch(e){}
+      return realFetch.apply(this,arguments);
+    };
+  })();
+}else{
+  window.__korvus={
+    websiteId:"${isFR ? "00000000-0000-4000-a000-000000001011" : "00000000-0000-4000-a000-000000001010"}",
+    apiKey:"kv_test_0000000000000000000000000000000000000000000000000000000000000001",
+    endpoint:"/api/ingest",
+    platform:"custom"
+  };
+}`,
+          }}
+        />
+        <script src="/korvus.min.js" async />
       </head>
       <body className="min-h-screen flex flex-col bg-[#fafaf7] text-[#07111f]">
         <LocaleProvider>
