@@ -7,6 +7,88 @@ import { injectSnippet, getSiteConfig } from "../helpers/inject-snippet"
 
 const adh = getSiteConfig("athletedatahub")
 
+test.describe("ADH — proof capture diagnostic", () => {
+  test("serves the proof bundles and configures the probe before the snippet", async ({
+    page,
+    request,
+  }) => {
+    const [snippetResponse, proofResponse] = await Promise.all([
+      request.get("http://localhost:3001/korvus.min.js"),
+      request.get("http://localhost:3001/korvus-proof.min.js"),
+    ])
+
+    expect(snippetResponse.ok()).toBe(true)
+    expect(proofResponse.ok()).toBe(true)
+    expect((await snippetResponse.body()).length).toBeGreaterThan(200_000)
+    expect((await proofResponse.body()).length).toBeGreaterThan(80_000)
+
+    let proofChunkRequested = false
+    await page.route(
+      "https://demo.korvus.fr/korvus-proof.min.js",
+      async (route) => {
+        proofChunkRequested = true
+        await route.fulfill({
+          status: 200,
+          contentType: "application/javascript",
+          body: "",
+        })
+      },
+    )
+    await page.goto("/?proof-diagnostic=1")
+    await expect.poll(() => proofChunkRequested).toBe(true)
+
+    const diagnostic = await page.evaluate(() => {
+      const w = window as typeof window & {
+        Cookiebot?: { consent?: { statistics?: boolean } }
+        __korvus?: {
+          endpoint?: string
+          enableProofCapture?: boolean
+          proofChunkUrl?: string
+        }
+        __proofProbe?: unknown[]
+      }
+
+      return {
+        consent: w.Cookiebot?.consent?.statistics,
+        endpoint: w.__korvus?.endpoint,
+        enabled: w.__korvus?.enableProofCapture,
+        chunkUrl: w.__korvus?.proofChunkUrl,
+        probeReady: Array.isArray(w.__proofProbe),
+      }
+    })
+
+    expect(diagnostic).toEqual({
+      consent: true,
+      endpoint: "https://app.korvus.fr/api/ingest",
+      enabled: true,
+      chunkUrl: "https://demo.korvus.fr/korvus-proof.min.js",
+      probeReady: true,
+    })
+
+    await page.goto("/")
+    const regularVisit = await page.evaluate(() => {
+      const w = window as typeof window & {
+        __korvus?: {
+          endpoint?: string
+          enableProofCapture?: boolean
+        }
+        __proofProbe?: unknown[]
+      }
+      return {
+        endpoint: w.__korvus?.endpoint,
+        enabled: w.__korvus?.enableProofCapture ?? false,
+        probeReady: Array.isArray(w.__proofProbe),
+      }
+    })
+
+    expect(regularVisit).toEqual({
+      endpoint: "/api/ingest",
+      enabled: false,
+      probeReady: false,
+    })
+  })
+})
+
 test.describe("ADH — bilingual storefront", () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
