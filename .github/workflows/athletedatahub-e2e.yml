@@ -1,0 +1,114 @@
+name: AthleteDataHub E2E
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/athletedatahub/**"
+      - "tests/specs/athletedatahub.spec.ts"
+      - ".github/workflows/athletedatahub-e2e.yml"
+  push:
+    branches: [main]
+    paths:
+      - "apps/athletedatahub/**"
+      - "tests/specs/athletedatahub.spec.ts"
+      - ".github/workflows/athletedatahub-e2e.yml"
+
+concurrency:
+  group: athletedatahub-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  athletedatahub-e2e:
+    name: athletedatahub-e2e (${{ matrix.label }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - label: chromium
+            project: athletedatahub
+            browser: chromium
+          - label: webkit
+            project: athletedatahub-webkit
+            browser: webkit
+    steps:
+      - name: Checkout test_website
+        uses: actions/checkout@v5
+        with:
+          path: test_website
+
+      - name: Checkout platform
+        uses: actions/checkout@v5
+        with:
+          repository: KorvusFR/korvus
+          path: platform
+          token: ${{ secrets.KORVUS_PLATFORM_PAT }}
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: |
+            platform/package-lock.json
+            test_website/tests/package-lock.json
+
+      - name: Install platform dependencies
+        working-directory: platform
+        run: npm ci
+
+      - name: Install test dependencies
+        working-directory: test_website/tests
+        run: npm ci
+
+      - name: Install app dependencies
+        run: |
+          for app in athletedatahub taguardian-com doomcheck floral-nuxt; do
+            if [ -f "test_website/apps/$app/package.json" ]; then
+              (cd "test_website/apps/$app" && npm ci)
+            fi
+          done
+
+      - name: Generate Prisma client
+        working-directory: platform
+        env:
+          DATABASE_URL: "postgresql://fake:fake@localhost:5432/fake"
+        run: npx prisma generate
+
+      - name: Build snippet
+        working-directory: platform
+        run: npm run snippet:build
+
+      - name: Install Playwright system dependencies
+        working-directory: test_website/tests
+        run: npx playwright install-deps ${{ matrix.browser }}
+
+      - name: Install Playwright browser
+        working-directory: test_website/tests
+        run: npx playwright install ${{ matrix.browser }}
+
+      - name: Run AthleteDataHub tests
+        working-directory: test_website/tests
+        env:
+          CI: "true"
+        run: npx playwright test --project=${{ matrix.project }}
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: athletedatahub-playwright-${{ matrix.label }}
+          path: test_website/tests/playwright-report/
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Upload traces and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: athletedatahub-traces-${{ matrix.label }}
+          path: test_website/tests/test-results/
+          retention-days: 14
+          if-no-files-found: ignore

@@ -17,18 +17,16 @@ on:
     branches: [main]
     paths:
       - "tests/**"
-      - "apps/athletedatahub/**"
+      - "!tests/specs/athletedatahub.spec.ts"
       - "apps/doomcheck/**"
       - "apps/floral-nuxt/**"
-      - ".github/workflows/snippet-e2e-mocked.yml"
   push:
     branches: [main]
     paths:
       - "tests/**"
-      - "apps/athletedatahub/**"
+      - "!tests/specs/athletedatahub.spec.ts"
       - "apps/doomcheck/**"
       - "apps/floral-nuxt/**"
-      - ".github/workflows/snippet-e2e-mocked.yml"
   repository_dispatch:
     types: [snippet-changed]
   workflow_dispatch:
