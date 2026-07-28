@@ -1,4 +1,10 @@
-export type Category = "clothing" | "equipment" | "nutrition";
+export type Category =
+  | "running"
+  | "trail"
+  | "triathlon"
+  | "cycling"
+  | "equipment"
+  | "nutrition";
 
 export interface Product {
   id: string;
@@ -17,6 +23,8 @@ export interface Product {
   reviewCount: number;
   variants: string[];
   colors: string[];
+  brand?: string;
+  badge?: string;
 }
 
 export interface CartItem {

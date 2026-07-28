@@ -27,6 +27,13 @@ athletedatahub.fr {
 	}
 }
 
+demo.korvus.fr {
+	encode gzip zstd
+	reverse_proxy athletedatahub:3000 {
+		trusted_proxies private_ranges
+	}
+}
+
 www.athletedatahub.com {
 	redir https://athletedatahub.com{uri} permanent
 }

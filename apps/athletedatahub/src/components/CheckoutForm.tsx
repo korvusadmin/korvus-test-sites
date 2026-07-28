@@ -8,7 +8,8 @@ import { useCart } from "@/context/CartContext";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
-import { t, getLocale, getCurrency } from "@/lib/i18n";
+import { t, getCurrency } from "@/lib/i18n";
+import { useLocale } from "@/context/LocaleContext";
 import { gtmPurchase } from "@/lib/gtm";
 
 interface FormData {
@@ -42,7 +43,7 @@ const initialForm: FormData = {
 export function CheckoutForm() {
   const router = useRouter();
   const { items, total, clearCart } = useCart();
-  const locale = getLocale();
+  const { locale } = useLocale();
   const [form, setForm] = useState<FormData>(initialForm);
   const [submitting, setSubmitting] = useState(false);
 
@@ -64,7 +65,7 @@ export function CheckoutForm() {
 
     // Simulate processing
     const orderNumber = `ADH-${Date.now().toString(36).toUpperCase()}`;
-    const currency = getCurrency();
+    const currency = getCurrency(locale);
     gtmPurchase({
       orderNumber,
       items: items.map((i) => ({
@@ -86,9 +87,9 @@ export function CheckoutForm() {
   if (items.length === 0) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
-        <p className="text-gray-600 mb-4">{t("emptyCart")}</p>
+        <p className="text-gray-600 mb-4">{t("emptyCart", locale)}</p>
         <Link href="/catalog">
-          <Button>{t("continueShopping")}</Button>
+          <Button>{t("continueShopping", locale)}</Button>
         </Link>
       </div>
     );
@@ -98,25 +99,25 @@ export function CheckoutForm() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
       <Breadcrumbs
         items={[
-          { label: t("home"), href: "/" },
-          { label: t("cart"), href: "/cart" },
-          { label: t("checkout") },
+          { label: t("home", locale), href: "/" },
+          { label: t("cart", locale), href: "/cart" },
+          { label: t("checkout", locale) },
         ]}
       />
 
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">{t("checkoutTitle")}</h1>
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">{t("checkoutTitle", locale)}</h1>
 
       <div className="flex flex-col lg:flex-row gap-8">
         {/* Form */}
         <form onSubmit={handleSubmit} className="flex-1 space-y-6">
           {/* Contact Info */}
           <section className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
-            <h2 className="font-bold text-gray-900">{t("contactInfo")}</h2>
+            <h2 className="font-bold text-gray-900">{t("contactInfo", locale)}</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
                 id="firstName"
                 name="firstName"
-                label={t("firstName")}
+                label={t("firstName", locale)}
                 value={form.firstName}
                 onChange={handleChange}
                 required
@@ -125,7 +126,7 @@ export function CheckoutForm() {
               <Input
                 id="lastName"
                 name="lastName"
-                label={t("lastName")}
+                label={t("lastName", locale)}
                 value={form.lastName}
                 onChange={handleChange}
                 required
@@ -136,7 +137,7 @@ export function CheckoutForm() {
               id="email"
               name="email"
               type="email"
-              label={t("email")}
+              label={t("email", locale)}
               value={form.email}
               onChange={handleChange}
               required
@@ -146,7 +147,7 @@ export function CheckoutForm() {
               id="phone"
               name="phone"
               type="tel"
-              label={t("phone")}
+              label={t("phone", locale)}
               value={form.phone}
               onChange={handleChange}
               autoComplete="tel"
@@ -155,11 +156,11 @@ export function CheckoutForm() {
 
           {/* Shipping Address */}
           <section className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
-            <h2 className="font-bold text-gray-900">{t("shippingAddress")}</h2>
+            <h2 className="font-bold text-gray-900">{t("shippingAddress", locale)}</h2>
             <Input
               id="address"
               name="address"
-              label={t("address")}
+              label={t("address", locale)}
               value={form.address}
               onChange={handleChange}
               required
@@ -169,7 +170,7 @@ export function CheckoutForm() {
               <Input
                 id="city"
                 name="city"
-                label={t("city")}
+                label={t("city", locale)}
                 value={form.city}
                 onChange={handleChange}
                 required
@@ -178,7 +179,7 @@ export function CheckoutForm() {
               <Input
                 id="postalCode"
                 name="postalCode"
-                label={t("postalCode")}
+                label={t("postalCode", locale)}
                 value={form.postalCode}
                 onChange={handleChange}
                 required
@@ -187,7 +188,7 @@ export function CheckoutForm() {
               <Input
                 id="country"
                 name="country"
-                label={t("country")}
+                label={t("country", locale)}
                 value={form.country}
                 onChange={handleChange}
                 required
@@ -200,13 +201,13 @@ export function CheckoutForm() {
           {/* Payment */}
           <section className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
             <div className="flex items-center gap-2">
-              <h2 className="font-bold text-gray-900">{t("paymentInfo")}</h2>
+              <h2 className="font-bold text-gray-900">{t("paymentInfo", locale)}</h2>
               <Lock className="w-4 h-4 text-gray-400" />
             </div>
             <Input
               id="cardNumber"
               name="cardNumber"
-              label={t("cardNumber")}
+              label={t("cardNumber", locale)}
               value={form.cardNumber}
               onChange={handleChange}
               required
@@ -218,7 +219,7 @@ export function CheckoutForm() {
               <Input
                 id="expiryDate"
                 name="expiryDate"
-                label={t("expiryDate")}
+                label={t("expiryDate", locale)}
                 value={form.expiryDate}
                 onChange={handleChange}
                 required
@@ -229,7 +230,7 @@ export function CheckoutForm() {
               <Input
                 id="cvv"
                 name="cvv"
-                label={t("cvv")}
+                label={t("cvv", locale)}
                 value={form.cvv}
                 onChange={handleChange}
                 required
@@ -258,14 +259,14 @@ export function CheckoutForm() {
               ? locale === "fr"
                 ? "Traitement en cours…"
                 : "Processing…"
-              : t("placeOrder")}
+              : t("placeOrder", locale)}
           </Button>
         </form>
 
         {/* Order Summary */}
         <div className="w-full lg:w-80 flex-shrink-0">
           <div className="bg-white rounded-xl border border-gray-200 p-6 sticky top-20">
-            <h2 className="font-bold text-gray-900 mb-4">{t("orderSummary")}</h2>
+            <h2 className="font-bold text-gray-900 mb-4">{t("orderSummary", locale)}</h2>
             <ul className="space-y-3 mb-4">
               {items.map((item) => {
                 const name = locale === "fr" ? item.nameFr : item.name;
@@ -288,18 +289,18 @@ export function CheckoutForm() {
             </ul>
             <div className="border-t border-gray-100 pt-3 space-y-2 text-sm">
               <div className="flex justify-between text-gray-600">
-                <span>{t("subtotal")}</span>
+                <span>{t("subtotal", locale)}</span>
                 <span>{formatAmt(total)}</span>
               </div>
               <div className="flex justify-between text-gray-600">
-                <span>{t("shipping")}</span>
+                <span>{t("shipping", locale)}</span>
                 <span className={shippingFee === 0 ? "text-green-600 font-medium" : ""}>
-                  {shippingFee === 0 ? t("free") : formatAmt(shippingFee)}
+                  {shippingFee === 0 ? t("free", locale) : formatAmt(shippingFee)}
                 </span>
               </div>
             </div>
             <div className="border-t border-gray-200 mt-3 pt-3 flex justify-between font-bold text-gray-900">
-              <span>{t("total")}</span>
+              <span>{t("total", locale)}</span>
               <span className="text-blue-700 text-lg">{formatAmt(grandTotal)}</span>
             </div>
           </div>

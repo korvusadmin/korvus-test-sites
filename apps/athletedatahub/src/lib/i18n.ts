@@ -1,15 +1,14 @@
 export type Locale = "en" | "fr";
 
 export function getLocale(): Locale {
-  return process.env.NEXT_PUBLIC_LOCALE === "FR" ? "fr" : "en";
+  return process.env.NEXT_PUBLIC_LOCALE === "EN" ? "en" : "fr";
 }
 
-export function getCurrency(): string {
-  return getLocale() === "fr" ? "EUR" : "USD";
+export function getCurrency(locale = getLocale()): string {
+  return locale === "fr" ? "EUR" : "USD";
 }
 
-export function formatPrice(priceEn: number, priceFr: number): string {
-  const locale = getLocale();
+export function formatPrice(priceEn: number, priceFr: number, locale = getLocale()): string {
   if (locale === "fr") {
     return `${priceFr.toFixed(2)} €`;
   }
@@ -24,7 +23,7 @@ export const labels = {
     cart: "Cart",
     checkout: "Checkout",
     // Categories
-    clothing: "Clothing",
+    clothing: "Running",
     equipment: "Equipment",
     nutrition: "Nutrition",
     allCategories: "All Categories",
@@ -73,9 +72,9 @@ export const labels = {
     orderNumber: "Order Number",
     continueBrowsing: "Continue Browsing",
     // Home
-    heroTitle: "Train Smarter, Perform Better",
+    heroTitle: "Built for the next finish line",
     heroSubtitle:
-      "Premium sports apparel, equipment, and nutrition for dedicated athletes.",
+      "Expert-selected running, trail and triathlon gear. Tested for the miles that matter.",
     shopNow: "Shop Now",
     featuredProducts: "Featured Products",
     shopByCategory: "Shop by Category",
@@ -121,7 +120,7 @@ export const labels = {
     cart: "Panier",
     checkout: "Commander",
     // Categories
-    clothing: "Vêtements",
+    clothing: "Running",
     equipment: "Équipements",
     nutrition: "Nutrition",
     allCategories: "Toutes les catégories",
@@ -170,9 +169,9 @@ export const labels = {
     orderNumber: "Numéro de commande",
     continueBrowsing: "Continuer mes achats",
     // Home
-    heroTitle: "Entraînez-vous mieux, performez davantage",
+    heroTitle: "Pensé pour votre prochaine ligne d’arrivée",
     heroSubtitle:
-      "Vêtements, équipements et nutrition premium pour athlètes engagés.",
+      "Running, trail et triathlon : du matériel sélectionné par des pratiquants, pour les kilomètres qui comptent.",
     shopNow: "Découvrir",
     featuredProducts: "Produits vedettes",
     shopByCategory: "Nos catégories",
@@ -215,7 +214,6 @@ export const labels = {
 
 export type LabelKey = keyof (typeof labels)["en"];
 
-export function t(key: LabelKey): string {
-  const locale = getLocale();
+export function t(key: LabelKey, locale = getLocale()): string {
   return labels[locale][key];
 }

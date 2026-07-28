@@ -4,12 +4,14 @@ import { useState } from "react";
 import type { Product } from "@/types";
 import { t } from "@/lib/i18n";
 import { AddToCartButton } from "@/components/AddToCartButton";
+import { useLocale } from "@/context/LocaleContext";
 
 interface ProductOptionsProps {
   product: Product;
 }
 
 export function ProductOptions({ product }: ProductOptionsProps) {
+  const { locale } = useLocale();
   const [selectedVariant, setSelectedVariant] = useState<string | undefined>(
     product.variants[0]
   );
@@ -22,7 +24,7 @@ export function ProductOptions({ product }: ProductOptionsProps) {
       {product.variants.length > 0 && (
         <div>
           <p className="text-sm font-semibold text-gray-700 mb-2">
-            {t("size")}
+            {t("size", locale)}
           </p>
           <div className="flex flex-wrap gap-2">
             {product.variants.map((v) => (
@@ -45,7 +47,7 @@ export function ProductOptions({ product }: ProductOptionsProps) {
       {product.colors.length > 0 && (
         <div>
           <p className="text-sm font-semibold text-gray-700 mb-2">
-            {t("color")}
+            {t("color", locale)}
           </p>
           <div className="flex flex-wrap gap-2">
             {product.colors.map((c) => (

@@ -1,8 +1,11 @@
+"use client";
+
 import Link from "next/link";
-import { Star } from "lucide-react";
+import Image from "next/image";
+import { Star, Heart } from "lucide-react";
 import type { Product } from "@/types";
-import { getLocale, formatPrice } from "@/lib/i18n";
-import { Badge } from "@/components/ui/Badge";
+import { formatPrice } from "@/lib/i18n";
+import { useLocale } from "@/context/LocaleContext";
 import { AddToCartButton } from "@/components/AddToCartButton";
 
 interface ProductCardProps {
@@ -10,16 +13,23 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product }: ProductCardProps) {
-  const locale = getLocale();
+  const { locale } = useLocale();
   const name = locale === "fr" ? product.nameFr : product.name;
-  const price = formatPrice(product.price, product.priceFr);
+  const price = formatPrice(product.price, product.priceFr, locale);
 
   return (
-    <div className="group bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col">
+    <article className="group bg-white border border-slate-200 hover:border-slate-400 transition-all overflow-hidden flex flex-col">
       {/* Image */}
       <Link href={`/products/${product.slug}`} className="block overflow-hidden">
-        <div className="aspect-square bg-gray-100 relative flex items-center justify-center">
-          <ProductImage category={product.category} />
+        <div
+          className="aspect-[4/5] bg-[#f4f5f2] relative overflow-hidden"
+          style={{ position: "relative", aspectRatio: "4 / 5" }}
+        >
+          <Image src={product.image} alt={name} fill sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw" className="object-cover group-hover:scale-[1.03] transition-transform duration-500" />
+          {product.badge && <span className="absolute left-3 top-3 bg-[#d8ff3e] text-[#07111f] text-[10px] uppercase tracking-wider font-black px-2.5 py-1">{product.badge}</span>}
+          <button aria-label={locale === "fr" ? "Ajouter aux favoris" : "Add to favourites"} className="absolute right-3 top-3 w-9 h-9 rounded-full bg-white/90 flex items-center justify-center">
+            <Heart className="w-4 h-4" />
+          </button>
           {!product.inStock && (
             <div className="absolute inset-0 bg-white/60 flex items-center justify-center">
               <span className="bg-gray-800 text-white text-xs font-semibold px-3 py-1 rounded-full">
@@ -32,22 +42,14 @@ export function ProductCard({ product }: ProductCardProps) {
 
       {/* Content */}
       <div className="flex flex-col flex-1 p-4 gap-2">
+        <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500">{product.brand}</p>
         <div className="flex items-start justify-between gap-2">
           <Link
             href={`/products/${product.slug}`}
-            className="text-sm font-semibold text-gray-900 hover:text-blue-700 transition-colors line-clamp-2 leading-snug"
+            className="text-[15px] font-bold text-[#07111f] hover:underline transition-colors line-clamp-2 leading-snug"
           >
             {name}
           </Link>
-          <Badge variant="info" className="flex-shrink-0 capitalize text-xs">
-            {locale === "fr"
-              ? product.category === "clothing"
-                ? "Vêtement"
-                : product.category === "equipment"
-                ? "Équipement"
-                : "Nutrition"
-              : product.category}
-          </Badge>
         </div>
 
         {/* Rating */}
@@ -71,31 +73,10 @@ export function ProductCard({ product }: ProductCardProps) {
 
         {/* Price + CTA */}
         <div className="flex items-center justify-between gap-2 mt-auto pt-2">
-          <span className="text-lg font-bold text-gray-900">{price}</span>
+          <span className="text-lg font-black text-[#07111f]">{price}</span>
           <AddToCartButton product={product} size="sm" />
         </div>
       </div>
-    </div>
-  );
-}
-
-function ProductImage({ category }: { category: string }) {
-  const colors: Record<string, { bg: string; text: string }> = {
-    clothing: { bg: "bg-indigo-50", text: "text-indigo-400" },
-    equipment: { bg: "bg-orange-50", text: "text-orange-400" },
-    nutrition: { bg: "bg-green-50", text: "text-green-400" },
-  };
-  const style = colors[category] ?? { bg: "bg-gray-100", text: "text-gray-400" };
-
-  const icons: Record<string, string> = {
-    clothing: "👕",
-    equipment: "🏋️",
-    nutrition: "💊",
-  };
-
-  return (
-    <div className={`w-full h-full flex items-center justify-center ${style.bg} group-hover:scale-105 transition-transform duration-300`}>
-      <span className="text-6xl select-none">{icons[category] ?? "📦"}</span>
-    </div>
+    </article>
   );
 }

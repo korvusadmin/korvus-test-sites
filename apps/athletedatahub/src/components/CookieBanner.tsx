@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { X, Cookie } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { pushDataLayer } from "@/lib/gtm";
+import { useLocale } from "@/context/LocaleContext";
 
 declare global {
   interface Window {
@@ -21,10 +22,10 @@ type ConsentState = "accepted" | "declined" | null;
 
 export function CookieBanner() {
   const [consent, setConsent] = useState<ConsentState | "loading">("loading");
-  const [isFr, setIsFr] = useState(false);
+  const { locale } = useLocale();
+  const isFr = locale === "fr";
 
   useEffect(() => {
-    setIsFr(document.documentElement.lang === "fr");
     try {
       const stored = localStorage.getItem(CONSENT_KEY) as ConsentState;
       setConsent(stored);
@@ -66,7 +67,7 @@ export function CookieBanner() {
   return (
     <div
       role="dialog"
-      aria-label="Cookie consent"
+      aria-label={isFr ? "Consentement aux cookies" : "Cookie consent"}
       className="fixed bottom-4 left-4 right-4 md:left-auto md:right-6 md:max-w-md z-50 bg-white border border-gray-200 rounded-2xl shadow-2xl p-5"
     >
       <div className="flex items-start gap-3">
@@ -92,7 +93,7 @@ export function CookieBanner() {
         <button
           onClick={decline}
           className="text-gray-400 hover:text-gray-600 flex-shrink-0"
-          aria-label="Close"
+          aria-label={isFr ? "Fermer" : "Close"}
         >
           <X className="w-4 h-4" />
         </button>

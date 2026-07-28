@@ -5,7 +5,8 @@ import { ShoppingCart, Check } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { Button } from "@/components/ui/Button";
 import type { Product } from "@/types";
-import { t, getLocale, getCurrency } from "@/lib/i18n";
+import { t, getCurrency } from "@/lib/i18n";
+import { useLocale } from "@/context/LocaleContext";
 import { gtmAddToCart } from "@/lib/gtm";
 
 interface AddToCartButtonProps {
@@ -23,12 +24,12 @@ export function AddToCartButton({
 }: AddToCartButtonProps) {
   const { addItem } = useCart();
   const [added, setAdded] = useState(false);
-  const locale = getLocale();
+  const { locale } = useLocale();
 
   if (!product.inStock) {
     return (
       <Button variant="secondary" size={size} disabled>
-        {t("outOfStock")}
+        {t("outOfStock", locale)}
       </Button>
     );
   }
@@ -52,7 +53,7 @@ export function AddToCartButton({
       category: product.category,
       price: locale === "fr" ? product.priceFr : product.price,
       quantity: 1,
-      currency: getCurrency(),
+      currency: getCurrency(locale),
       variant: selectedVariant,
     });
     setAdded(true);
@@ -75,7 +76,7 @@ export function AddToCartButton({
       ) : (
         <>
           <ShoppingCart className="w-4 h-4" />
-          {size !== "sm" && t("addToCart")}
+          {size !== "sm" && t("addToCart", locale)}
         </>
       )}
     </Button>
