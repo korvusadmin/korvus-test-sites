@@ -56,8 +56,20 @@ if(proofDiagnostic){
       sessionStorage.setItem("korvus_sid_created_at",new Date().toISOString());
     }
   }catch(e){}
+  // Pas de websiteId ICI, volontairement -- mode apiKey-only.
+  //
+  // Ce build sert TROIS domaines (athletedatahub.com/.fr et demo.korvus.fr, cf.
+  // Caddyfile) mais isFR est fige au build : il ne peut pas distinguer
+  // demo.korvus.fr. En annoncant un websiteId, on basculait l'ingestion en mode
+  // "ownership", qui compare l'Origin aux allowed_origins de CE site -- et
+  // demo.korvus.fr n'est pas une origine d'athletedatahub.com. Resultat : 403
+  // origin_denied sur chaque envoi, donc la sonde ci-dessous n'a jamais rien pu
+  // observer.
+  //
+  // Sans websiteId, le serveur resout par Origin (resolveWebsiteFromOrigin) :
+  // chaque domaine tombe sur SON website, avec un seul build et une seule cle
+  // (la cle API appartient a l'organisation, pas au site).
   window.__korvus={
-    websiteId:"${isFR ? "00000000-0000-4000-a000-000000001011" : "00000000-0000-4000-a000-000000001010"}",
     apiKey:"kv_test_0000000000000000000000000000000000000000000000000000000000000001",
     endpoint:"https://app.korvus.fr/api/ingest",
     platform:"custom",
