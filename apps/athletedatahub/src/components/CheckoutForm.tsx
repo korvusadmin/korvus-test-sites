@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { CreditCard, Lock } from "lucide-react";
@@ -10,7 +10,19 @@ import { Input } from "@/components/ui/Input";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { t, getCurrency } from "@/lib/i18n";
 import { useLocale } from "@/context/LocaleContext";
+import { useDemoBug } from "@/context/DemoBugContext";
+import {
+  formatAmount,
+  readAppliedPromo,
+  shippingFeeFor,
+  subtotalFor,
+  writeAppliedPromo,
+} from "@/lib/cart-totals";
 import { gtmPurchase } from "@/lib/gtm";
+
+// Voir PromoCodeForm : sans borne, une requete qui ne repond jamais fige le CTA
+// pendant deux minutes et gache la prise.
+const PAYMENT_TIMEOUT_MS = 8_000;
 
 interface FormData {
   firstName: string;
@@ -42,30 +54,63 @@ const initialForm: FormData = {
 
 export function CheckoutForm() {
   const router = useRouter();
-  const { items, total, clearCart } = useCart();
+  const { items, clearCart } = useCart();
   const { locale } = useLocale();
+  const bug = useDemoBug();
   const [form, setForm] = useState<FormData>(initialForm);
   const [submitting, setSubmitting] = useState(false);
+  const [paymentFailed, setPaymentFailed] = useState(false);
 
-  const FREE_SHIPPING_THRESHOLD = 50;
-  const shippingFee = total >= FREE_SHIPPING_THRESHOLD ? 0 : locale === "fr" ? 5.99 : 6.99;
+  // La remise appliquee au panier doit survivre au changement de page, sinon le
+  // visiteur voit le prix plein revenir entre les deux ecrans.
+  const [discountRate, setDiscountRate] = useState(0);
+  useEffect(() => {
+    setDiscountRate(readAppliedPromo()?.rate ?? 0);
+  }, []);
+
+  const subtotal = subtotalFor(items, locale);
+  const discount = subtotal * discountRate;
+  const total = subtotal - discount;
+  const shippingFee = shippingFeeFor(total, locale);
   const grandTotal = total + shippingFee;
 
-  const formatAmt = (amount: number) =>
-    locale === "fr" ? `${amount.toFixed(2)} €` : `$${amount.toFixed(2)}`;
+  const formatAmt = (amount: number) => formatAmount(amount, locale);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
+    setPaymentFailed(false);
 
-    // Simulate processing
     const orderNumber = `ADH-${Date.now().toString(36).toUpperCase()}`;
     const currency = getCurrency(locale);
+
+    let approved = false;
+    try {
+      const res = await fetch("/api/paiement", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: grandTotal, currency, bug }),
+        signal: AbortSignal.timeout(PAYMENT_TIMEOUT_MS),
+      });
+      approved = res.ok;
+    } catch {
+      approved = false;
+    }
+
+    if (!approved) {
+      setPaymentFailed(true);
+      setSubmitting(false);
+      return;
+    }
+
+    // gtmPurchase APRES l'autorisation, jamais avant : un purchase pousse sur
+    // un paiement refuse ferait mentir le dataLayer, et n'importe quel prospect
+    // qui ouvre la console pendant la demo le verrait.
     gtmPurchase({
       orderNumber,
       items: items.map((i) => ({
@@ -78,10 +123,9 @@ export function CheckoutForm() {
       total: grandTotal,
       currency,
     });
-    setTimeout(() => {
-      clearCart();
-      router.push(`/checkout/confirmation?order=${orderNumber}`);
-    }, 1200);
+    clearCart();
+    writeAppliedPromo(null);
+    router.push(`/checkout/confirmation?order=${orderNumber}`);
   }
 
   if (items.length === 0) {
@@ -249,17 +293,30 @@ export function CheckoutForm() {
             </div>
           </section>
 
+          {/*
+            Message INLINE dans le flux du formulaire, juste au-dessus du CTA.
+            Ni modale ni drawer : [role=dialog] n'est jamais revelable par la
+            politique de masquage, la preuve video afficherait des asterisques
+            a l'endroit exact ou se joue toute l'histoire.
+          */}
+          {paymentFailed && (
+            <p
+              className="checkout-error form-error text-sm text-red-600"
+              role="alert"
+              data-error=""
+            >
+              {t("paymentDeclined", locale)}
+            </p>
+          )}
+
           <Button
             type="submit"
             size="lg"
             fullWidth
             disabled={submitting}
+            data-korvus-label={t("placeOrder", locale)}
           >
-            {submitting
-              ? locale === "fr"
-                ? "Traitement en cours…"
-                : "Processing…"
-              : t("placeOrder", locale)}
+            {submitting ? t("orderProcessing", locale) : t("placeOrder", locale)}
           </Button>
         </form>
 
@@ -290,8 +347,14 @@ export function CheckoutForm() {
             <div className="border-t border-gray-100 pt-3 space-y-2 text-sm">
               <div className="flex justify-between text-gray-600">
                 <span>{t("subtotal", locale)}</span>
-                <span>{formatAmt(total)}</span>
+                <span>{formatAmt(subtotal)}</span>
               </div>
+              {discount > 0 && (
+                <div className="flex justify-between text-green-700 font-medium">
+                  <span>{t("discount", locale)}</span>
+                  <span>-{formatAmt(discount)}</span>
+                </div>
+              )}
               <div className="flex justify-between text-gray-600">
                 <span>{t("shipping", locale)}</span>
                 <span className={shippingFee === 0 ? "text-green-600 font-medium" : ""}>

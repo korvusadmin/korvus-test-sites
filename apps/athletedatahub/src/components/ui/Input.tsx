@@ -19,6 +19,8 @@ export function Input({ label, error, className, id, ...props }: InputProps) {
       )}
       <input
         id={id}
+        aria-invalid={error ? true : undefined}
+        aria-errormessage={error && id ? `${id}-error` : undefined}
         className={cn(
           "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed",
           error && "border-red-500 focus:ring-red-500",
@@ -26,7 +28,21 @@ export function Input({ label, error, className, id, ...props }: InputProps) {
         )}
         {...props}
       />
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {/*
+        La bordure rouge seule n'est qu'une couleur : elle ne porte aucun des
+        selecteurs qu'un outil de supervision reconnait. `field-error`,
+        role=alert et aria-invalid rendent l'erreur de saisie observable, ce
+        qui est tout l'interet d'un site de recette.
+      */}
+      {error && (
+        <p
+          id={id ? `${id}-error` : undefined}
+          className="field-error text-xs text-red-600"
+          role="alert"
+        >
+          {error}
+        </p>
+      )}
     </div>
   );
 }

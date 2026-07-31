@@ -36,7 +36,16 @@ export const labels = {
     reviews: "reviews",
     relatedProducts: "Related Products",
     backToCatalog: "Back to Catalog",
+    sizeUnavailable: "This size is no longer available",
     // Cart
+    promoCode: "Promo code",
+    promoApply: "Apply",
+    promoApplying: "Applying…",
+    promoCampaign: "UTMB code: 25% off until race day",
+    promoApplied: "Code UTMB25 applied, 25% off",
+    promoInvalid: "This promo code is not valid",
+    promoFailed: "The promo code could not be applied",
+    discount: "Discount",
     yourCart: "Your Cart",
     emptyCart: "Your cart is empty",
     continueShopping: "Continue Shopping",
@@ -64,7 +73,9 @@ export const labels = {
     expiryDate: "Expiry Date",
     cvv: "CVV",
     placeOrder: "Place Order",
+    orderProcessing: "Processing…",
     orderSummary: "Order Summary",
+    paymentDeclined: "The payment was declined, please try again",
     // Confirmation
     orderConfirmed: "Order Confirmed!",
     orderThankYou:
@@ -133,7 +144,16 @@ export const labels = {
     reviews: "avis",
     relatedProducts: "Produits similaires",
     backToCatalog: "Retour au catalogue",
+    sizeUnavailable: "Cette pointure n'est plus disponible",
     // Cart
+    promoCode: "Code promo",
+    promoApply: "Appliquer",
+    promoApplying: "Application…",
+    promoCampaign: "Code UTMB : -25 % jusqu'au départ",
+    promoApplied: "Code UTMB25 appliqué, remise de 25 %",
+    promoInvalid: "Ce code promo n'est pas valide",
+    promoFailed: "Le code promo n'a pas pu être appliqué",
+    discount: "Remise",
     yourCart: "Votre panier",
     emptyCart: "Votre panier est vide",
     continueShopping: "Continuer mes achats",
@@ -161,7 +181,9 @@ export const labels = {
     expiryDate: "Date d'expiration",
     cvv: "CVV",
     placeOrder: "Valider la commande",
+    orderProcessing: "Traitement en cours…",
     orderSummary: "Récapitulatif",
+    paymentDeclined: "Le paiement a été refusé, merci de réessayer",
     // Confirmation
     orderConfirmed: "Commande confirmée !",
     orderThankYou:
