@@ -680,3 +680,244 @@ test.describe("ADH — quick-add hors PDP (elargissement gate S2+S3)", () => {
     expect(events.length, "anti-pattern button must not emit ATC").toBe(0)
   })
 })
+
+// ---------------------------------------------------------------------------
+// Modes de demo : ?bug= (pannes jouables) et ?film= (contexte de tournage)
+//
+// Ces deux parametres existent pour produire les preuves video commerciales.
+// Le contrat que ce bloc verrouille tient en une phrase : ils sont OPT-IN, et
+// une visite sans parametre voit un site strictement sain. Un bug actif par
+// defaut casserait le happy path chaine, le quick-add hors PDP et la vitrine
+// bilingue -- en chromium ET en webkit, donc six echecs pour une regression.
+// ---------------------------------------------------------------------------
+
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const PINNED_SID = "435b8f99-e523-4b27-95ff-ead084fb2333"
+
+/** Reimplemente djb2Hash (snippet/src/url-sanitizer.ts) pour verifier le tirage. */
+function djb2(input: string): number {
+  let hash = 5381
+  for (let i = 0; i < input.length; i++) {
+    hash = ((hash << 5) + hash) + input.charCodeAt(i)
+  }
+  return hash >>> 0
+}
+
+const CART_FIXTURE = [
+  {
+    productId: "tri-002",
+    slug: "openwater-flex-3-2",
+    name: "Openwater Flex 3/2 Wetsuit",
+    nameFr: "Combinaison Openwater Flex 3/2",
+    price: 389.9,
+    priceFr: 359.9,
+    image: "/images/products/wetsuit.png",
+    quantity: 1,
+    selectedVariant: "M",
+    selectedColor: "Noir",
+  },
+]
+
+test.describe("ADH — modes de demo", () => {
+  test("visite normale : aucune panne, aucun mode film", async ({ page }) => {
+    await page.goto("/products/summit-grip-pro")
+    await expect(page.locator("[data-error]")).toHaveCount(0)
+
+    const state = await page.evaluate(() => {
+      const w = window as typeof window & {
+        __korvus?: { enableProofCapture?: boolean }
+      }
+      return {
+        film: sessionStorage.getItem("adh_film"),
+        bug: sessionStorage.getItem("adh_bug"),
+        proof: w.__korvus?.enableProofCapture ?? false,
+      }
+    })
+    expect(state).toEqual({ film: null, bug: null, proof: false })
+  })
+
+  test("?bug=pointure : le message ne sort que sur la pointure piegee", async ({
+    page,
+  }) => {
+    await page.goto("/products/summit-grip-pro?bug=pointure")
+
+    // Au chargement, la premiere pointure est pre-selectionnee : rien ne doit
+    // s'afficher tant que le visiteur n'a pas clique. C'est ce clic qui est le
+    // geste causal filme.
+    await expect(page.locator("p.size-error")).toHaveCount(0)
+
+    await page.getByRole("button", { name: "42", exact: true }).click()
+    const message = page.locator("p.size-error")
+    await expect(message).toHaveText("Cette pointure n'est plus disponible")
+    // Les selecteurs que le collecteur d'erreurs UX reconnait.
+    await expect(message).toHaveAttribute("role", "alert")
+    await expect(message).toHaveAttribute("data-error", "")
+
+    await page.getByRole("button", { name: "43", exact: true }).click()
+    await expect(page.locator("p.size-error")).toHaveCount(0)
+  })
+
+  test("?bug=pointure : un autre modele n'est pas affecte", async ({ page }) => {
+    await page.goto("/products/sky-race-light?bug=pointure")
+    await page.getByRole("button", { name: "42", exact: true }).click()
+    await expect(page.locator("p.size-error")).toHaveCount(0)
+  })
+
+  test("?bug=promo : le code promo renvoie 500 et le message s'affiche", async ({
+    page,
+  }) => {
+    await page.addInitScript((cart) => {
+      localStorage.setItem("adh_cart", JSON.stringify(cart))
+      localStorage.setItem("adh_cookie_consent", "accepted")
+    }, CART_FIXTURE)
+
+    await page.goto("/cart?bug=promo")
+    await page.fill("#promo-code", "UTMB25")
+
+    const [response] = await Promise.all([
+      page.waitForResponse((r) => r.url().includes("/api/panier/code-promo")),
+      page.locator("#promo-form button[type=submit]").click(),
+    ])
+    expect(response.status()).toBe(500)
+
+    const message = page.locator("p.promo-error")
+    await expect(message).toHaveText("Le code promo n'a pas pu être appliqué")
+    await expect(message).toHaveAttribute("role", "alert")
+  })
+
+  test("sans panne : le meme code promo s'applique et remise le panier", async ({
+    page,
+  }) => {
+    await page.addInitScript((cart) => {
+      localStorage.setItem("adh_cart", JSON.stringify(cart))
+      localStorage.setItem("adh_cookie_consent", "accepted")
+    }, CART_FIXTURE)
+
+    await page.goto("/cart")
+    await page.fill("#promo-code", "UTMB25")
+
+    const [response] = await Promise.all([
+      page.waitForResponse((r) => r.url().includes("/api/panier/code-promo")),
+      page.locator("#promo-form button[type=submit]").click(),
+    ])
+    expect(response.status()).toBe(200)
+
+    await expect(page.locator("p.promo-error")).toHaveCount(0)
+    await expect(page.locator("p.promo-feedback")).toBeVisible()
+    // 359,90 - 25 % = 269,925, arrondi a 269,92 par toFixed. Au-dessus du
+    // seuil de port offert (50), donc pas de frais a ajouter.
+    await expect(page.locator(".cart-total")).toHaveText("269.92 €")
+  })
+
+  test("?bug=paiement : l'autorisation renvoie 500 et la commande n'est pas creee", async ({
+    page,
+  }) => {
+    await page.addInitScript((cart) => {
+      localStorage.setItem("adh_cart", JSON.stringify(cart))
+      localStorage.setItem("adh_cookie_consent", "accepted")
+    }, CART_FIXTURE)
+
+    await page.goto("/checkout?bug=paiement")
+    for (const [field, value] of [
+      ["#firstName", "Camille"],
+      ["#lastName", "Roux"],
+      ["#email", "camille.roux@example.test"],
+      ["#address", "12 rue des Coureurs"],
+      ["#city", "Chamonix"],
+      ["#postalCode", "74400"],
+      ["#country", "France"],
+      ["#cardNumber", "4242 4242 4242 4242"],
+      ["#expiryDate", "12/29"],
+      ["#cvv", "123"],
+    ]) {
+      await page.fill(field, value)
+    }
+
+    const [response] = await Promise.all([
+      page.waitForResponse((r) => r.url().includes("/api/paiement")),
+      page.locator("form button[type=submit]").click(),
+    ])
+    expect(response.status()).toBe(500)
+
+    const message = page.locator("p.checkout-error")
+    await expect(message).toHaveText("Le paiement a été refusé, merci de réessayer")
+    // Le visiteur reste sur le checkout : aucune commande n'a ete creee.
+    expect(new URL(page.url()).pathname).toBe("/checkout")
+  })
+
+  test("?film=1 : session dediee, pre-echantillonnee, et collante entre pages", async ({
+    page,
+  }) => {
+    // Le chunk de preuve est servi par le domaine de prod : on le neutralise
+    // pour que le test ne depende pas du reseau.
+    await page.route("https://demo.korvus.fr/**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/javascript",
+        body: "",
+      })
+    })
+
+    await page.goto("/?film=1")
+    const first = await page.evaluate(() => ({
+      sid: sessionStorage.getItem("korvus_sid"),
+      createdAt: sessionStorage.getItem("korvus_sid_created_at"),
+    }))
+
+    expect(first.sid).toMatch(UUID_V4)
+    expect(first.sid).not.toBe(PINNED_SID)
+    expect(first.createdAt).toBeTruthy()
+    expect(Number.isNaN(Date.parse(first.createdAt!))).toBe(false)
+    // Le tirage doit tomber dans les 25 % filmes : djb2(sid) < 2^30.
+    expect(djb2(first.sid!)).toBeLessThan(1_073_741_824)
+
+    // Le mode colle sans reporter le parametre, pour que la page precedente
+    // entre dans le film.
+    await page.goto("/cart")
+    const second = await page.evaluate(() => {
+      const w = window as typeof window & {
+        __korvus?: { enableProofCapture?: boolean; proofPolicyId?: string }
+      }
+      return {
+        sid: sessionStorage.getItem("korvus_sid"),
+        enabled: w.__korvus?.enableProofCapture ?? false,
+        policyId: w.__korvus?.proofPolicyId,
+      }
+    })
+    expect(second.sid).toBe(first.sid)
+    expect(second.enabled).toBe(true)
+    // Sans politique, la capture part en repli strict : tout est masque, y
+    // compris le message d'erreur que la preuve doit montrer.
+    expect(second.policyId).toBe("f2c220321a992bef70b65931")
+  })
+
+  test("?film=new force une session neuve", async ({ page }) => {
+    await page.route("https://demo.korvus.fr/**", async (route) => {
+      await route.fulfill({ status: 200, contentType: "application/javascript", body: "" })
+    })
+
+    await page.goto("/?film=1")
+    const first = await page.evaluate(() => sessionStorage.getItem("korvus_sid"))
+    await page.goto("/?film=new")
+    const second = await page.evaluate(() => sessionStorage.getItem("korvus_sid"))
+
+    expect(second).toMatch(UUID_V4)
+    expect(second).not.toBe(first)
+    expect(djb2(second!)).toBeLessThan(1_073_741_824)
+  })
+
+  test("?bug=off remet le site en etat sain sans changer d'onglet", async ({
+    page,
+  }) => {
+    await page.goto("/products/summit-grip-pro?bug=pointure")
+    await page.getByRole("button", { name: "42", exact: true }).click()
+    await expect(page.locator("p.size-error")).toBeVisible()
+
+    await page.goto("/products/summit-grip-pro?bug=off")
+    await page.getByRole("button", { name: "42", exact: true }).click()
+    await expect(page.locator("p.size-error")).toHaveCount(0)
+    expect(
+      await page.evaluate(() => sessionStorage.getItem("adh_bug")),
+    ).toBeNull()
+  })
+})

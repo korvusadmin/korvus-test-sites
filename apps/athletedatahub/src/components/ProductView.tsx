@@ -54,7 +54,7 @@ export function ProductView({ product, related }: { product: Product; related: P
               </Badge>
             </div>
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">{product.brand}</p>
-            <h1 className="text-4xl lg:text-5xl font-black tracking-tight text-[#07111f]">{name}</h1>
+            <h1 className="product-title text-4xl lg:text-5xl font-black tracking-tight text-[#07111f]">{name}</h1>
             <div className="flex items-center gap-2">
               <div className="flex">
                 {Array.from({ length: 5 }).map((_, index) => (
@@ -67,7 +67,7 @@ export function ProductView({ product, related }: { product: Product; related: P
               <span className="text-sm font-medium text-gray-700">{product.rating}</span>
               <span className="text-sm text-gray-400">({product.reviewCount} {t("reviews", locale)})</span>
             </div>
-            <div className="text-3xl font-black text-[#07111f]">{price}</div>
+            <div className="product-price text-3xl font-black text-[#07111f]">{price}</div>
             <p className="text-gray-600 leading-relaxed">{description}</p>
             <div className="flex flex-wrap gap-2">
               {product.tags.map((tag) => <Badge key={tag}>{tag}</Badge>)}

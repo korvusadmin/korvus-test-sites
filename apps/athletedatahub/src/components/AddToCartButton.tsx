@@ -66,6 +66,7 @@ export function AddToCartButton({
       size={size}
       onClick={handleAdd}
       data-add-to-cart=""
+      data-korvus-label={t("addToCart", locale)}
       className={added ? "bg-green-600 hover:bg-green-600" : ""}
     >
       {added ? (

@@ -1,18 +1,33 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { Trash2, Plus, Minus, ShoppingBag } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { Button } from "@/components/ui/Button";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { PromoCodeForm } from "@/components/PromoCodeForm";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/context/LocaleContext";
 
 export function CartView() {
-  const { items, total, removeItem, updateQuantity } = useCart();
+  const { items, removeItem, updateQuantity } = useCart();
   const { locale } = useLocale();
+  const [discountRate, setDiscountRate] = useState(0);
 
-  const FREE_SHIPPING_THRESHOLD = locale === "fr" ? 50 : 50;
+  // Le total du contexte somme item.price, c'est-a-dire le prix EN, alors que
+  // chaque ligne est affichee en priceFr. En francais, le recapitulatif
+  // annoncait donc un total superieur a la somme des lignes visibles a l'ecran
+  // -- une incoherence que le premier prospect attentif aurait relevee sur la
+  // video. On recalcule dans la devise affichee.
+  const subtotal = items.reduce(
+    (sum, i) => sum + (locale === "fr" ? i.priceFr : i.price) * i.quantity,
+    0
+  );
+  const discount = subtotal * discountRate;
+  const total = subtotal - discount;
+
+  const FREE_SHIPPING_THRESHOLD = 50;
   const shippingFee = total >= FREE_SHIPPING_THRESHOLD ? 0 : locale === "fr" ? 5.99 : 6.99;
 
   const formatAmt = (amount: number) =>
@@ -151,8 +166,14 @@ export function CartView() {
             <div className="space-y-2 text-sm">
               <div className="flex justify-between text-gray-600">
                 <span>{t("subtotal", locale)}</span>
-                <span>{formatAmt(total)}</span>
+                <span className="cart-subtotal">{formatAmt(subtotal)}</span>
               </div>
+              {discount > 0 && (
+                <div className="flex justify-between text-green-700 font-medium">
+                  <span>{t("discount", locale)}</span>
+                  <span>-{formatAmt(discount)}</span>
+                </div>
+              )}
               <div className="flex justify-between text-gray-600">
                 <span>{t("shipping", locale)}</span>
                 <span className={shippingFee === 0 ? "text-green-600 font-medium" : ""}>
@@ -168,13 +189,15 @@ export function CartView() {
               )}
             </div>
 
+            <PromoCodeForm onApplied={setDiscountRate} />
+
             <div className="border-t border-gray-100 pt-3 flex justify-between font-bold text-gray-900">
               <span>{t("total", locale)}</span>
-              <span>{formatAmt(total + shippingFee)}</span>
+              <span className="cart-total">{formatAmt(total + shippingFee)}</span>
             </div>
 
             <Link href="/checkout">
-              <Button fullWidth size="lg">
+              <Button fullWidth size="lg" data-korvus-label={t("proceedToCheckout", locale)}>
                 {t("proceedToCheckout", locale)}
               </Button>
             </Link>
