@@ -77,7 +77,7 @@ function __sampledUuid(){
 //  - une session DIFFERENTE par prise (l'ancien code epinglait un sid en dur,
 //    identique a toutes les visites : impossible de produire deux preuves
 //    distinctes, et le moteur exige >= 5 sessions par signature) ;
-//  - un mode qui survive a la navigation entre pages sans traîner le parametre,
+//  - un mode qui survive a la navigation entre pages sans reporter le parametre,
 //    pour que le geste causal de la page precedente entre dans le film.
 //
 // Le diagnostic, lui, doit rester NON collant : le test E2E verifie qu'une
