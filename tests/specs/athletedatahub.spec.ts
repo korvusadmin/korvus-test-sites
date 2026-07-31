@@ -720,6 +720,18 @@ const CART_FIXTURE = [
 
 test.describe("ADH — modes de demo", () => {
   test("visite normale : aucune panne, aucun mode film", async ({ page }) => {
+    // Table rase explicite. Le drapeau de panne est collant en sessionStorage,
+    // par conception : c'est ce qui lui permet de survivre a la navigation
+    // pendant un tournage. Un test qui affirme "le site est sain" ne doit donc
+    // pas dependre de ce qu'une autre execution a laisse derriere elle.
+    await page.addInitScript(() => {
+      try {
+        sessionStorage.clear()
+      } catch {
+        /* stockage indisponible : rien a nettoyer */
+      }
+    })
+
     await page.goto("/products/summit-grip-pro")
     await expect(page.locator("[data-error]")).toHaveCount(0)
 
@@ -980,34 +992,38 @@ const SCOPE_PAGES: Record<string, { url: string; prepare?: string }> = {
   checkout: { url: "/checkout" },
 }
 
+const POLICY = JSON.parse(
+  fs
+    .readFileSync(POLICY_FILE, "utf8")
+    .replace(/^window\.__korvusProofPolicy=/, "")
+    .replace(/;\s*$/, ""),
+) as { rules: PolicyRule[] }
+
 test.describe("ADH — politique de masquage", () => {
-  test("aucun selecteur revele n'est mort", async ({ page }) => {
-    test.setTimeout(90_000)
+  // Un test par portee, et non une boucle de navigations sur la meme page :
+  // chaque cas part d'un onglet neuf, ce qui elimine tout enchainement de
+  // `goto` susceptible de s'interrompre l'un l'autre.
+  for (const rule of POLICY.rules) {
+    const scope = rule.path ?? rule.page_type
+    const target = scope ? SCOPE_PAGES[scope] : undefined
+    if (!target || rule.reveal === undefined || rule.reveal === "*") continue
+    const selectors = rule.reveal.filter((s) => !CONDITIONAL.has(s))
+    if (selectors.length === 0) continue
 
-    const raw = fs.readFileSync(POLICY_FILE, "utf8")
-    const policy = JSON.parse(
-      raw.replace(/^window\.__korvusProofPolicy=/, "").replace(/;\s*$/, ""),
-    ) as { rules: PolicyRule[] }
-
-    await page.addInitScript((cart) => {
-      localStorage.setItem("adh_cookie_consent", "accepted")
-      localStorage.setItem("adh_cart", JSON.stringify(cart))
-    }, CART_FIXTURE)
-
-    const dead: string[] = []
-
-    for (const rule of policy.rules) {
-      const scope = rule.path ?? rule.page_type
-      const target = scope ? SCOPE_PAGES[scope] : undefined
-      if (!target || rule.reveal === undefined || rule.reveal === "*") continue
+    test(`${scope} : aucun selecteur revele n'est mort`, async ({ page }) => {
+      await page.addInitScript((cart) => {
+        localStorage.setItem("adh_cookie_consent", "accepted")
+        localStorage.setItem("adh_cart", JSON.stringify(cart))
+      }, CART_FIXTURE)
 
       await page.goto(target.url)
+      await page.waitForLoadState("load")
       if (target.prepare === "size42") {
         await page.getByRole("button", { name: "42", exact: true }).click()
       }
 
-      for (const selector of rule.reveal) {
-        if (CONDITIONAL.has(selector)) continue
+      const dead: string[] = []
+      for (const selector of selectors) {
         // Attendre plutot que compter tout de suite : le panier et le
         // recapitulatif se peuplent depuis localStorage APRES le montage, et
         // webkit y met plus de temps que chromium. Un comptage immediat
@@ -1015,14 +1031,14 @@ test.describe("ADH — politique de masquage", () => {
         await page
           .locator(selector)
           .first()
-          .waitFor({ state: "attached", timeout: 5_000 })
-          .catch(() => dead.push(`${scope} -> ${selector}`))
+          .waitFor({ state: "attached", timeout: 8_000 })
+          .catch(() => dead.push(selector))
       }
-    }
 
-    expect(
-      dead,
-      "selecteurs reveles sans aucune cible dans le DOM : la video serait masquee a cet endroit",
-    ).toEqual([])
-  })
+      expect(
+        dead,
+        `selecteurs reveles sans cible sur ${target.url} : la video serait masquee a cet endroit`,
+      ).toEqual([])
+    })
+  }
 })
