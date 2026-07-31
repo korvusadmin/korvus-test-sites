@@ -976,9 +976,27 @@ interface PolicyRule {
   reveal?: string[] | "*"
 }
 
+// La SOURCE versionnee de la politique, pas un artefact copie.
+//
+// Ce test lisait `apps/athletedatahub/public/proof-policy/<id>.js`, une copie
+// deposee a la main dans ce depot. Elle a disparu avec le basculement du site
+// vers le CDN (31/07) -- et c'est tant mieux : une copie que personne ne
+// resynchronise finit par decrire une politique qui n'est plus appliquee, donc
+// par valider des selecteurs qui ne revelent plus rien.
+//
+// On lit desormais le JSON de `platform`, qui est ce que le workflow
+// proof-policies.yml publie sur le CDN. Meme resolution de chemin que
+// SNIPPET_DIST_PATH dans performance.spec.ts : le workflow checkout `platform`
+// a cote de `test_website`.
 const POLICY_FILE = path.resolve(
   __dirname,
-  "../../apps/athletedatahub/public/proof-policy/f2c220321a992bef70b65931.js",
+  "..",
+  "..",
+  "..",
+  "platform",
+  "config",
+  "proof-policies",
+  "demo-korvus-fr.json",
 )
 
 /** Selecteurs qui n'apparaissent qu'apres une erreur ou une action : hors gate. */
@@ -992,6 +1010,10 @@ const SCOPE_PAGES: Record<string, { url: string; prepare?: string }> = {
   checkout: { url: "/checkout" },
 }
 
+// Le JSON source se lit tel quel : c'est le build (scripts/build-proof-policies.js)
+// qui l'enveloppe dans `window.__korvusProofPolicy=...;` pour le CDN. On retire
+// quand meme l'enveloppe si elle est presente, pour qu'un pointage accidentel
+// vers l'artefact publie ne fasse pas echouer le parse de facon obscure.
 const POLICY = JSON.parse(
   fs
     .readFileSync(POLICY_FILE, "utf8")

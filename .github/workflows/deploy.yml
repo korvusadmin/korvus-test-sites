@@ -39,6 +39,42 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # Le site de demonstration doit servir EXACTEMENT ce qu'un client recoit.
+      #
+      # Il embarque ses propres copies du snippet, et c'est voulu : elles le
+      # rendent autonome, testable sans reseau externe, et servi par le meme
+      # domaine que la politique de masquage. Mais une copie qu'on resynchronise
+      # a la main se desynchronise -- constate le 31/07, trois versions
+      # coexistaient (1.16.0 dans le depot, 1.19.0 en ligne, 1.20.0 sur le CDN),
+      # et la demo montrait donc un build que plus personne ne recevait.
+      #
+      # On les rafraichit donc A CHAQUE DEPLOIEMENT, depuis le CDN de
+      # production. Le depot garde une copie pour les tests ; ce qui part sur le
+      # VPS est toujours la derniere version publiee, sans intervention.
+      #
+      # Ne PAS remplacer par un curl direct dans le SCP : on veut echouer AVANT
+      # d'ecraser quoi que ce soit sur le VPS si le CDN repond mal.
+      - name: Rafraichir le snippet depuis le CDN de production
+        run: |
+          set -euo pipefail
+          DIR=apps/athletedatahub/public
+          for F in korvus.min.js korvus-proof.min.js; do
+            curl -fsS --compressed --max-time 30 \
+              "https://cdn.korvus.fr/v1/$F" -o "/tmp/$F"
+            # Un CDN qui rend une page d'erreur en 200 produirait un fichier
+            # minuscule et parfaitement valide du point de vue de curl.
+            SIZE=$(wc -c < "/tmp/$F")
+            if [ "$SIZE" -lt 50000 ]; then
+              echo "::error::$F fait $SIZE octets, trop petit pour un bundle"
+              exit 1
+            fi
+            mv "/tmp/$F" "$DIR/$F"
+            echo "$F rafraichi ($SIZE octets)"
+          done
+          # La version doit etre lisible : c'est elle qui remonte dans
+          # sessions.snippet_version et qui sert au diagnostic d'incident.
+          grep -o '__korvus_version="[^"]*"' "$DIR/korvus.min.js" | head -1
+
       - name: Sync files to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
