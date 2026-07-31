@@ -43,7 +43,7 @@ export function CategoryView({
         <p className="text-xs uppercase tracking-[0.18em] text-[#d8ff3e] font-bold mb-2">
           {fr ? "Sélection AthleteDataHub" : "AthleteDataHub selection"}
         </p>
-        <h1 className="text-4xl md:text-5xl font-black">{catLabel}</h1>
+        <h1 className="plp-title text-4xl md:text-5xl font-black">{catLabel}</h1>
         <p className="text-slate-300 mt-2">
           {fr
             ? "Notre sélection testée et approuvée pour vos entraînements et vos courses."

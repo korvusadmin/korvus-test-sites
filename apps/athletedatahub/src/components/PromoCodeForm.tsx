@@ -82,6 +82,7 @@ export function PromoCodeForm({ onApplied }: PromoCodeFormProps) {
         <Button
           type="submit"
           variant="outline"
+          className="cta-label"
           disabled={state === "pending"}
           data-korvus-label={t("promoApply", locale)}
         >

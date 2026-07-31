@@ -36,7 +36,7 @@ export default function CatalogPage() {
 
       <div className="mb-10 bg-[#07111f] text-white px-7 py-10 md:px-10">
         <p className="text-xs uppercase tracking-[0.18em] text-[#d8ff3e] font-bold mb-2">AthleteDataHub · {fr ? "Boutique endurance" : "Endurance store"}</p>
-        <h1 className="text-4xl md:text-5xl font-black tracking-tight">{fr ? "Tout l’équipement pour aller plus loin" : "All the gear to go further"}</h1>
+        <h1 className="plp-title text-4xl md:text-5xl font-black tracking-tight">{fr ? "Tout l’équipement pour aller plus loin" : "All the gear to go further"}</h1>
         <p className="text-slate-300 mt-3 max-w-2xl">{fr ? "Running, trail, triathlon, électronique et nutrition : 30 références choisies pour accompagner vos objectifs." : "Running, trail, triathlon, electronics and nutrition: 30 products selected to support your goals."}</p>
       </div>
       <div className="flex flex-col md:flex-row gap-8">

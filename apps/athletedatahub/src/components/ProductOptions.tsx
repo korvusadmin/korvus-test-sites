@@ -40,7 +40,7 @@ export function ProductOptions({ product }: ProductOptionsProps) {
     <div className="flex flex-col gap-4">
       {product.variants.length > 0 && (
         <div>
-          <p className="text-sm font-semibold text-gray-700 mb-2">
+          <p className="option-label text-sm font-semibold text-gray-700 mb-2">
             {t("size", locale)}
           </p>
           <div className="flex flex-wrap gap-2">
@@ -49,7 +49,7 @@ export function ProductOptions({ product }: ProductOptionsProps) {
                 key={v}
                 onClick={() => setSelectedVariant(v)}
                 data-korvus-label={`${t("size", locale)} ${v}`}
-                className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${
+                className={`size-option px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${
                   selectedVariant === v
                     ? "border-blue-600 bg-blue-50 text-blue-700"
                     : "border-gray-300 text-gray-700 hover:border-gray-400"
@@ -79,7 +79,7 @@ export function ProductOptions({ product }: ProductOptionsProps) {
 
       {product.colors.length > 0 && (
         <div>
-          <p className="text-sm font-semibold text-gray-700 mb-2">
+          <p className="option-label text-sm font-semibold text-gray-700 mb-2">
             {t("color", locale)}
           </p>
           <div className="flex flex-wrap gap-2">
@@ -87,7 +87,7 @@ export function ProductOptions({ product }: ProductOptionsProps) {
               <button
                 key={c}
                 onClick={() => setSelectedColor(c)}
-                className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${
+                className={`color-option px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${
                   selectedColor === c
                     ? "border-blue-600 bg-blue-50 text-blue-700"
                     : "border-gray-300 text-gray-700 hover:border-gray-400"

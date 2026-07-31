@@ -42,11 +42,11 @@ export function ProductCard({ product }: ProductCardProps) {
 
       {/* Content */}
       <div className="flex flex-col flex-1 p-4 gap-2">
-        <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500">{product.brand}</p>
+        <p className="product-brand text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500">{product.brand}</p>
         <div className="flex items-start justify-between gap-2">
           <Link
             href={`/products/${product.slug}`}
-            className="text-[15px] font-bold text-[#07111f] hover:underline transition-colors line-clamp-2 leading-snug"
+            className="product-title text-[15px] font-bold text-[#07111f] hover:underline transition-colors line-clamp-2 leading-snug"
           >
             {name}
           </Link>
@@ -73,7 +73,7 @@ export function ProductCard({ product }: ProductCardProps) {
 
         {/* Price + CTA */}
         <div className="flex items-center justify-between gap-2 mt-auto pt-2">
-          <span className="text-lg font-black text-[#07111f]">{price}</span>
+          <span className="product-price text-lg font-black text-[#07111f]">{price}</span>
           <AddToCartButton product={product} size="sm" />
         </div>
       </div>

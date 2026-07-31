@@ -88,7 +88,7 @@ export function CartView() {
                 <div className="flex-1 min-w-0">
                   <Link
                     href={`/products/${item.slug}`}
-                    className="font-semibold text-gray-900 hover:text-blue-700 line-clamp-2 text-sm"
+                    className="cart-line-title font-semibold text-gray-900 hover:text-blue-700 line-clamp-2 text-sm"
                   >
                     {name}
                   </Link>
@@ -102,7 +102,7 @@ export function CartView() {
                       {t("color", locale)}: {item.selectedColor}
                     </p>
                   )}
-                  <p className="text-blue-700 font-bold mt-1">
+                  <p className="cart-line-price text-blue-700 font-bold mt-1">
                     {formatAmt(itemPrice)}
                   </p>
                 </div>
@@ -199,7 +199,7 @@ export function CartView() {
             </div>
 
             <Link href="/checkout">
-              <Button fullWidth size="lg" data-korvus-label={t("proceedToCheckout", locale)}>
+              <Button fullWidth size="lg" className="cta-label" data-korvus-label={t("proceedToCheckout", locale)}>
                 {t("proceedToCheckout", locale)}
               </Button>
             </Link>

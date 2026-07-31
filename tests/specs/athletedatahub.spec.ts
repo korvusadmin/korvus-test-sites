@@ -720,6 +720,18 @@ const CART_FIXTURE = [
 
 test.describe("ADH — modes de demo", () => {
   test("visite normale : aucune panne, aucun mode film", async ({ page }) => {
+    // Table rase explicite. Le drapeau de panne est collant en sessionStorage,
+    // par conception : c'est ce qui lui permet de survivre a la navigation
+    // pendant un tournage. Un test qui affirme "le site est sain" ne doit donc
+    // pas dependre de ce qu'une autre execution a laisse derriere elle.
+    await page.addInitScript(() => {
+      try {
+        sessionStorage.clear()
+      } catch {
+        /* stockage indisponible : rien a nettoyer */
+      }
+    })
+
     await page.goto("/products/summit-grip-pro")
     await expect(page.locator("[data-error]")).toHaveCount(0)
 
@@ -941,4 +953,92 @@ test.describe("ADH — modes de demo", () => {
       await page.evaluate(() => sessionStorage.getItem("adh_bug")),
     ).toBeNull()
   })
+})
+
+// ---------------------------------------------------------------------------
+// Politique de masquage : chaque selecteur revele doit exister dans le DOM
+//
+// C'est le mode de panne le plus couteux de la preuve video, et le plus
+// silencieux : une politique dont les selecteurs ne matchent rien produit une
+// video valide, encodee, `ready` -- et entierement masquee. Rien ne le signale,
+// ni un statut, ni un test, ni un log. On s'en apercoit devant le prospect.
+//
+// Le cas s'est produit : la politique visait `/produit/*` et `.stock-msg` alors
+// que le site sert `/products/<slug>` et n'a jamais eu cette classe.
+// ---------------------------------------------------------------------------
+
+import fs from "node:fs"
+import path from "node:path"
+
+interface PolicyRule {
+  path?: string
+  page_type?: string
+  reveal?: string[] | "*"
+}
+
+const POLICY_FILE = path.resolve(
+  __dirname,
+  "../../apps/athletedatahub/public/proof-policy/f2c220321a992bef70b65931.js",
+)
+
+/** Selecteurs qui n'apparaissent qu'apres une erreur ou une action : hors gate. */
+const CONDITIONAL = new Set([".promo-feedback", ".checkout-error", ".field-error"])
+
+/** Une page representative par portee de regle, et ce qu'il faut y faire. */
+const SCOPE_PAGES: Record<string, { url: string; prepare?: string }> = {
+  plp: { url: "/catalog/trail" },
+  "/products/*": { url: "/products/summit-grip-pro?bug=pointure", prepare: "size42" },
+  cart: { url: "/cart" },
+  checkout: { url: "/checkout" },
+}
+
+const POLICY = JSON.parse(
+  fs
+    .readFileSync(POLICY_FILE, "utf8")
+    .replace(/^window\.__korvusProofPolicy=/, "")
+    .replace(/;\s*$/, ""),
+) as { rules: PolicyRule[] }
+
+test.describe("ADH — politique de masquage", () => {
+  // Un test par portee, et non une boucle de navigations sur la meme page :
+  // chaque cas part d'un onglet neuf, ce qui elimine tout enchainement de
+  // `goto` susceptible de s'interrompre l'un l'autre.
+  for (const rule of POLICY.rules) {
+    const scope = rule.path ?? rule.page_type
+    const target = scope ? SCOPE_PAGES[scope] : undefined
+    if (!target || rule.reveal === undefined || rule.reveal === "*") continue
+    const selectors = rule.reveal.filter((s) => !CONDITIONAL.has(s))
+    if (selectors.length === 0) continue
+
+    test(`${scope} : aucun selecteur revele n'est mort`, async ({ page }) => {
+      await page.addInitScript((cart) => {
+        localStorage.setItem("adh_cookie_consent", "accepted")
+        localStorage.setItem("adh_cart", JSON.stringify(cart))
+      }, CART_FIXTURE)
+
+      await page.goto(target.url)
+      await page.waitForLoadState("load")
+      if (target.prepare === "size42") {
+        await page.getByRole("button", { name: "42", exact: true }).click()
+      }
+
+      const dead: string[] = []
+      for (const selector of selectors) {
+        // Attendre plutot que compter tout de suite : le panier et le
+        // recapitulatif se peuplent depuis localStorage APRES le montage, et
+        // webkit y met plus de temps que chromium. Un comptage immediat
+        // declarerait morts des selecteurs parfaitement vivants.
+        await page
+          .locator(selector)
+          .first()
+          .waitFor({ state: "attached", timeout: 8_000 })
+          .catch(() => dead.push(selector))
+      }
+
+      expect(
+        dead,
+        `selecteurs reveles sans cible sur ${target.url} : la video serait masquee a cet endroit`,
+      ).toEqual([])
+    })
+  }
 })
