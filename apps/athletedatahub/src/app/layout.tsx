@@ -88,7 +88,11 @@ if(__film){
   __ssSet("adh_film","1");
   var __sid=__ssGet("korvus_sid");
   var __uuidRe=/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  if(__filmParam==="new"||!__sid||!__uuidRe.test(__sid)){
+  // Le sid epingle du mode diagnostic est un UUID v4 valide : sans ce test, un
+  // onglet passe par ?proof-diagnostic=1 avant ?film=1 garderait ce sid partage
+  // et deux prises seraient attribuees au meme visiteur.
+  var __pinned="435b8f99-e523-4b27-95ff-ead084fb2333";
+  if(__filmParam==="new"||!__sid||__sid===__pinned||!__uuidRe.test(__sid)){
     // Les DEUX cles ensemble : session.ts ne reutilise un sid persiste que si
     // korvus_sid ET korvus_sid_created_at sont valides, sinon il regenere les
     // deux et le tirage pre-echantillonne est perdu en silence.
@@ -97,8 +101,8 @@ if(__film){
   }
 }
 
-var proofDiagnostic=__sp.get("proof-diagnostic")==="1"||__film;
-if(proofDiagnostic){
+var __proofDiagnostic=__sp.get("proof-diagnostic")==="1"||__film;
+if(__proofDiagnostic){
   window.Cookiebot={consent:{statistics:true}};
   // Epinglage historique du sid : seulement si rien n'est deja pose. Le mode
   // film a la priorite, et deux tournages ne partagent plus jamais un sid.

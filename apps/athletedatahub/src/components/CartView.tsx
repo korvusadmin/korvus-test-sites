@@ -1,12 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Trash2, Plus, Minus, ShoppingBag } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { Button } from "@/components/ui/Button";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { PromoCodeForm } from "@/components/PromoCodeForm";
+import {
+  FREE_SHIPPING_THRESHOLD,
+  formatAmount,
+  readAppliedPromo,
+  shippingFeeFor,
+  subtotalFor,
+} from "@/lib/cart-totals";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/context/LocaleContext";
 
@@ -15,23 +22,18 @@ export function CartView() {
   const { locale } = useLocale();
   const [discountRate, setDiscountRate] = useState(0);
 
-  // Le total du contexte somme item.price, c'est-a-dire le prix EN, alors que
-  // chaque ligne est affichee en priceFr. En francais, le recapitulatif
-  // annoncait donc un total superieur a la somme des lignes visibles a l'ecran
-  // -- une incoherence que le premier prospect attentif aurait relevee sur la
-  // video. On recalcule dans la devise affichee.
-  const subtotal = items.reduce(
-    (sum, i) => sum + (locale === "fr" ? i.priceFr : i.price) * i.quantity,
-    0
-  );
+  // Lecture apres montage : sessionStorage n'existe pas au rendu serveur, et
+  // un etat initial different des deux cotes ferait diverger l'hydratation.
+  useEffect(() => {
+    setDiscountRate(readAppliedPromo()?.rate ?? 0);
+  }, []);
+
+  const subtotal = subtotalFor(items, locale);
   const discount = subtotal * discountRate;
   const total = subtotal - discount;
+  const shippingFee = shippingFeeFor(total, locale);
 
-  const FREE_SHIPPING_THRESHOLD = 50;
-  const shippingFee = total >= FREE_SHIPPING_THRESHOLD ? 0 : locale === "fr" ? 5.99 : 6.99;
-
-  const formatAmt = (amount: number) =>
-    locale === "fr" ? `${amount.toFixed(2)} €` : `$${amount.toFixed(2)}`;
+  const formatAmt = (amount: number) => formatAmount(amount, locale);
 
   if (items.length === 0) {
     return (

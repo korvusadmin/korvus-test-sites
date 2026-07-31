@@ -29,6 +29,15 @@ export function DemoBugProvider({ children }: { children: React.ReactNode }) {
     setBug(resolveDemoBug());
   }, [pathname]);
 
+  // usePathname ne bouge pas quand seuls les parametres changent : un retour
+  // arriere de /cart?bug=promo vers /cart laisserait la panne active. Aucune
+  // navigation de l'app ne fait ca aujourd'hui, mais le navigateur, si.
+  useEffect(() => {
+    const onPopState = (): void => setBug(resolveDemoBug());
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
   return (
     <DemoBugContext.Provider value={bug}>{children}</DemoBugContext.Provider>
   );

@@ -6,8 +6,14 @@ import { Input } from "@/components/ui/Input";
 import { t } from "@/lib/i18n";
 import { useLocale } from "@/context/LocaleContext";
 import { useDemoBug } from "@/context/DemoBugContext";
+import { writeAppliedPromo } from "@/lib/cart-totals";
 
 type PromoState = "idle" | "pending" | "applied" | "invalid" | "error";
+
+// Une requete qui ne repond jamais laisse le bouton en "Application..." jusqu'a
+// l'expiration TCP, soit environ deux minutes. Pendant un tournage, ca gache la
+// prise ET consomme un slot de quota de preuve.
+const PROMO_TIMEOUT_MS = 8_000;
 
 interface PromoCodeFormProps {
   /** Remonte le taux de remise applique (0 = aucune remise). */
@@ -20,6 +26,12 @@ export function PromoCodeForm({ onApplied }: PromoCodeFormProps) {
   const [code, setCode] = useState("");
   const [state, setState] = useState<PromoState>("idle");
 
+  /** Remonte la remise au panier ET la persiste, pour qu'elle survive au checkout. */
+  function applyRate(rate: number, appliedCode?: string) {
+    writeAppliedPromo(rate > 0 && appliedCode ? { code: appliedCode, rate } : null);
+    onApplied(rate);
+  }
+
   async function handleApply(e: React.FormEvent) {
     e.preventDefault();
     setState("pending");
@@ -28,23 +40,24 @@ export function PromoCodeForm({ onApplied }: PromoCodeFormProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code, bug }),
+        signal: AbortSignal.timeout(PROMO_TIMEOUT_MS),
       });
       if (!res.ok) {
         setState("error");
-        onApplied(0);
+        applyRate(0);
         return;
       }
       const data = (await res.json()) as { applied?: boolean; rate?: number };
       if (data.applied === true) {
         setState("applied");
-        onApplied(data.rate ?? 0);
+        applyRate(data.rate ?? 0, code.trim().toUpperCase());
       } else {
         setState("invalid");
-        onApplied(0);
+        applyRate(0);
       }
     } catch {
       setState("error");
-      onApplied(0);
+      applyRate(0);
     }
   }
 

@@ -809,6 +809,27 @@ test.describe("ADH — modes de demo", () => {
     await expect(page.locator(".cart-total")).toHaveText("269.92 €")
   })
 
+  test("la remise du panier survit au passage au checkout", async ({ page }) => {
+    await page.addInitScript((cart) => {
+      localStorage.setItem("adh_cart", JSON.stringify(cart))
+      localStorage.setItem("adh_cookie_consent", "accepted")
+    }, CART_FIXTURE)
+
+    await page.goto("/cart")
+    await page.fill("#promo-code", "UTMB25")
+    await Promise.all([
+      page.waitForResponse((r) => r.url().includes("/api/panier/code-promo")),
+      page.locator("#promo-form button[type=submit]").click(),
+    ])
+    await expect(page.locator(".cart-total")).toHaveText("269.92 €")
+
+    // Sans persistance, le checkout recalculait sur le prix plein : le visiteur
+    // voyait 269,92 EUR au panier puis 359,90 EUR a l'ecran suivant.
+    await page.goto("/checkout")
+    await expect(page.getByText("-89.97 €")).toBeVisible()
+    await expect(page.getByText("269.92 €").first()).toBeVisible()
+  })
+
   test("?bug=paiement : l'autorisation renvoie 500 et la commande n'est pas creee", async ({
     page,
   }) => {
