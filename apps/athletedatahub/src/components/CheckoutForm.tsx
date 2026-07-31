@@ -314,6 +314,7 @@ export function CheckoutForm() {
             size="lg"
             fullWidth
             disabled={submitting}
+            className="cta-label"
             data-korvus-label={t("placeOrder", locale)}
           >
             {submitting ? t("orderProcessing", locale) : t("placeOrder", locale)}
@@ -333,7 +334,7 @@ export function CheckoutForm() {
                     key={item.productId}
                     className="flex items-center justify-between gap-2 text-sm"
                   >
-                    <span className="text-gray-700 line-clamp-1 flex-1">
+                    <span className="order-item text-gray-700 line-clamp-1 flex-1">
                       {name}
                       <span className="text-gray-400 ml-1">×{item.quantity}</span>
                     </span>
@@ -347,7 +348,7 @@ export function CheckoutForm() {
             <div className="border-t border-gray-100 pt-3 space-y-2 text-sm">
               <div className="flex justify-between text-gray-600">
                 <span>{t("subtotal", locale)}</span>
-                <span>{formatAmt(subtotal)}</span>
+                <span className="cart-subtotal">{formatAmt(subtotal)}</span>
               </div>
               {discount > 0 && (
                 <div className="flex justify-between text-green-700 font-medium">
@@ -364,7 +365,7 @@ export function CheckoutForm() {
             </div>
             <div className="border-t border-gray-200 mt-3 pt-3 flex justify-between font-bold text-gray-900">
               <span>{t("total", locale)}</span>
-              <span className="text-blue-700 text-lg">{formatAmt(grandTotal)}</span>
+              <span className="cart-total text-blue-700 text-lg">{formatAmt(grandTotal)}</span>
             </div>
           </div>
         </div>

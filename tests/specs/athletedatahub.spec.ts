@@ -942,3 +942,87 @@ test.describe("ADH — modes de demo", () => {
     ).toBeNull()
   })
 })
+
+// ---------------------------------------------------------------------------
+// Politique de masquage : chaque selecteur revele doit exister dans le DOM
+//
+// C'est le mode de panne le plus couteux de la preuve video, et le plus
+// silencieux : une politique dont les selecteurs ne matchent rien produit une
+// video valide, encodee, `ready` -- et entierement masquee. Rien ne le signale,
+// ni un statut, ni un test, ni un log. On s'en apercoit devant le prospect.
+//
+// Le cas s'est produit : la politique visait `/produit/*` et `.stock-msg` alors
+// que le site sert `/products/<slug>` et n'a jamais eu cette classe.
+// ---------------------------------------------------------------------------
+
+import fs from "node:fs"
+import path from "node:path"
+
+interface PolicyRule {
+  path?: string
+  page_type?: string
+  reveal?: string[] | "*"
+}
+
+const POLICY_FILE = path.resolve(
+  __dirname,
+  "../../apps/athletedatahub/public/proof-policy/f2c220321a992bef70b65931.js",
+)
+
+/** Selecteurs qui n'apparaissent qu'apres une erreur ou une action : hors gate. */
+const CONDITIONAL = new Set([".promo-feedback", ".checkout-error", ".field-error"])
+
+/** Une page representative par portee de regle, et ce qu'il faut y faire. */
+const SCOPE_PAGES: Record<string, { url: string; prepare?: string }> = {
+  plp: { url: "/catalog/trail" },
+  "/products/*": { url: "/products/summit-grip-pro?bug=pointure", prepare: "size42" },
+  cart: { url: "/cart" },
+  checkout: { url: "/checkout" },
+}
+
+test.describe("ADH — politique de masquage", () => {
+  test("aucun selecteur revele n'est mort", async ({ page }) => {
+    test.setTimeout(90_000)
+
+    const raw = fs.readFileSync(POLICY_FILE, "utf8")
+    const policy = JSON.parse(
+      raw.replace(/^window\.__korvusProofPolicy=/, "").replace(/;\s*$/, ""),
+    ) as { rules: PolicyRule[] }
+
+    await page.addInitScript((cart) => {
+      localStorage.setItem("adh_cookie_consent", "accepted")
+      localStorage.setItem("adh_cart", JSON.stringify(cart))
+    }, CART_FIXTURE)
+
+    const dead: string[] = []
+
+    for (const rule of policy.rules) {
+      const scope = rule.path ?? rule.page_type
+      const target = scope ? SCOPE_PAGES[scope] : undefined
+      if (!target || rule.reveal === undefined || rule.reveal === "*") continue
+
+      await page.goto(target.url)
+      if (target.prepare === "size42") {
+        await page.getByRole("button", { name: "42", exact: true }).click()
+      }
+
+      for (const selector of rule.reveal) {
+        if (CONDITIONAL.has(selector)) continue
+        // Attendre plutot que compter tout de suite : le panier et le
+        // recapitulatif se peuplent depuis localStorage APRES le montage, et
+        // webkit y met plus de temps que chromium. Un comptage immediat
+        // declarerait morts des selecteurs parfaitement vivants.
+        await page
+          .locator(selector)
+          .first()
+          .waitFor({ state: "attached", timeout: 5_000 })
+          .catch(() => dead.push(`${scope} -> ${selector}`))
+      }
+    }
+
+    expect(
+      dead,
+      "selecteurs reveles sans aucune cible dans le DOM : la video serait masquee a cet endroit",
+    ).toEqual([])
+  })
+})
