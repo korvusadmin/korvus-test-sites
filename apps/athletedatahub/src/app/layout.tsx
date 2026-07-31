@@ -130,20 +130,12 @@ if(__proofDiagnostic){
     endpoint:"https://app.korvus.fr/api/ingest",
     platform:"custom",
     enableProofCapture:true,
-    // PAS de proofChunkUrl : sans lui, le loader prend son defaut, qui est
-    // cdn.korvus.fr -- donc le chunk ET la politique de masquage viennent du
-    // CDN, comme chez un vrai client. C'est le sens du basculement du 31/07 :
-    // ce site servait ses propres copies de korvus.min.js et du chunk, figees
-    // au moment ou quelqu'un pensait a les recopier. Elles ont derive (1.16.0
-    // dans le depot, 1.19.0 en ligne, 1.20.0 sur le CDN) et la demo se
-    // retrouvait a demontrer une version que plus personne ne recevait.
-    //
+    proofChunkUrl:"https://demo.korvus.fr/korvus-proof.min.js",
     // Sans politique de masquage, le chunk part en repli STRICT : texte masque,
     // medias bloques. La video est alors un mur d'asterisques, y compris sur le
     // message d'erreur -- c'est-a-dire sur la seule chose qu'elle doit prouver.
-    // La politique est publiee sur le CDN par proof-policies.yml, a
-    // v1/proof-policy/<id>.js ; le loader l'y cherche puisqu'il derive son URL
-    // de celle du chunk.
+    // Le loader derive l'URL du proofChunkUrl ci-dessus, donc le fichier doit
+    // etre servi par CE domaine : public/proof-policy/<id>.js.
     proofPolicyId:"f2c220321a992bef70b65931"
   };
   window.__proofProbe=[];
@@ -172,12 +164,7 @@ if(__proofDiagnostic){
 }`,
           }}
         />
-        {/* Le CDN, jamais une copie locale : ce site doit charger EXACTEMENT
-            ce que recoit un client. Une copie dans public/ se resynchronise a
-            la main, donc se desynchronise -- constate le 31/07, trois versions
-            differentes coexistaient. La demo ne prouve rien si elle demontre
-            un build que personne n'a. */}
-        <script src="https://cdn.korvus.fr/v1/korvus.min.js" async />
+        <script src="/korvus.min.js" async />
       </head>
       <body className="min-h-screen flex flex-col bg-[#fafaf7] text-[#07111f]">
         <LocaleProvider>
