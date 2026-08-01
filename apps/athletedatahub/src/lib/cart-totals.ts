@@ -37,7 +37,12 @@ export function shippingFeeFor(total: number, locale: Locale): number {
 }
 
 export function formatAmount(amount: number, locale: Locale): string {
-  return locale === "fr" ? `${amount.toFixed(2)} €` : `$${amount.toFixed(2)}`;
+  // Virgule decimale en francais : un site FR qui affiche "569.90 €" se
+  // remarque tout de suite en gros plan. On reste sur toFixed (deterministe,
+  // pas d'Intl) et on substitue le separateur.
+  return locale === "fr"
+    ? `${amount.toFixed(2).replace(".", ",")} €`
+    : `$${amount.toFixed(2)}`;
 }
 
 /**
