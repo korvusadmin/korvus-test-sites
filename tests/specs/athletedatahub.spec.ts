@@ -775,6 +775,23 @@ test.describe("ADH — modes de demo", () => {
     await expect(page.locator("p.size-error")).toHaveCount(0)
   })
 
+  test("le panier affiche la vraie photo de chaque produit", async ({ page }) => {
+    await page.addInitScript((cart) => {
+      localStorage.setItem("adh_cart", JSON.stringify(cart))
+      localStorage.setItem("adh_cookie_consent", "accepted")
+    }, CART_FIXTURE)
+
+    await page.goto("/cart")
+
+    // Une vignette par ligne, servie par l'optimiseur Next depuis l'image du
+    // produit (et pas un placeholder). naturalWidth > 0 prouve que le fichier
+    // a vraiment ete charge : un src casse rendrait 0.
+    const thumb = page.locator("a[href^='/products/'] img").first()
+    await expect(thumb).toBeVisible()
+    await expect(thumb).toHaveAttribute("src", /wetsuit\.png/)
+    expect(await thumb.evaluate((n: HTMLImageElement) => n.naturalWidth)).toBeGreaterThan(0)
+  })
+
   test("?bug=promo : le code promo renvoie 500 et le message s'affiche", async ({
     page,
   }) => {
@@ -795,6 +812,63 @@ test.describe("ADH — modes de demo", () => {
     const message = page.locator("p.promo-error")
     await expect(message).toHaveText("Le code promo n'a pas pu être appliqué")
     await expect(message).toHaveAttribute("role", "alert")
+
+    // Le champ se vide : c'est LA friction du scenario de demo (il faut retaper
+    // le code a chaque essai, d'ou l'acharnement sur le bouton). Le dashboard de
+    // demo decrit ce champ penible cote platform ; si ce vidage disparait, la
+    // demo raconte quelque chose que le site ne fait plus.
+    await expect(page.locator("#promo-code")).toHaveValue("")
+  })
+
+  test("?bug=promo : deux essais de suite laissent le message d'erreur et un champ vide", async ({
+    page,
+  }) => {
+    await page.addInitScript((cart) => {
+      localStorage.setItem("adh_cart", JSON.stringify(cart))
+      localStorage.setItem("adh_cookie_consent", "accepted")
+    }, CART_FIXTURE)
+
+    await page.goto("/cart?bug=promo")
+
+    // Deux passages complets saisie -> clic -> 500, comme un visiteur qui
+    // s'acharne. Le second doit se comporter exactement comme le premier (pas
+    // d'etat "pending" colle, pas de message qui disparait).
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await page.fill("#promo-code", "UTMB25")
+      const [response] = await Promise.all([
+        page.waitForResponse((r) => r.url().includes("/api/panier/code-promo")),
+        page.locator("#promo-form button[type=submit]").click(),
+      ])
+      expect(response.status()).toBe(500)
+      await expect(page.locator("p.promo-error")).toBeVisible()
+      await expect(page.locator("#promo-code")).toHaveValue("")
+    }
+
+    // Aucune remise n'a ete appliquee : le total reste le sous-total du panier.
+    await expect(page.locator("p.promo-feedback.text-green-700")).toHaveCount(0)
+  })
+
+  test("sans panne : la saisie du code promo est conservee apres un echec", async ({
+    page,
+  }) => {
+    await page.addInitScript((cart) => {
+      localStorage.setItem("adh_cart", JSON.stringify(cart))
+      localStorage.setItem("adh_cookie_consent", "accepted")
+    }, CART_FIXTURE)
+
+    await page.goto("/cart")
+    // Code inconnu -> 200 { applied: false } : un refus normal, hors panne. Le
+    // site doit alors se comporter correctement et GARDER la saisie -- le
+    // vidage est une friction reservee au scenario de demo.
+    await page.fill("#promo-code", "CODEBIDON")
+
+    await Promise.all([
+      page.waitForResponse((r) => r.url().includes("/api/panier/code-promo")),
+      page.locator("#promo-form button[type=submit]").click(),
+    ])
+
+    await expect(page.locator("p.promo-error")).toBeVisible()
+    await expect(page.locator("#promo-code")).toHaveValue("CODEBIDON")
   })
 
   test("sans panne : le meme code promo s'applique et remise le panier", async ({
@@ -818,7 +892,7 @@ test.describe("ADH — modes de demo", () => {
     await expect(page.locator("p.promo-feedback")).toBeVisible()
     // 359,90 - 25 % = 269,925, arrondi a 269,92 par toFixed. Au-dessus du
     // seuil de port offert (50), donc pas de frais a ajouter.
-    await expect(page.locator(".cart-total")).toHaveText("269.92 €")
+    await expect(page.locator(".cart-total")).toHaveText("269,92 €")
   })
 
   test("la remise du panier survit au passage au checkout", async ({ page }) => {
@@ -833,13 +907,13 @@ test.describe("ADH — modes de demo", () => {
       page.waitForResponse((r) => r.url().includes("/api/panier/code-promo")),
       page.locator("#promo-form button[type=submit]").click(),
     ])
-    await expect(page.locator(".cart-total")).toHaveText("269.92 €")
+    await expect(page.locator(".cart-total")).toHaveText("269,92 €")
 
     // Sans persistance, le checkout recalculait sur le prix plein : le visiteur
     // voyait 269,92 EUR au panier puis 359,90 EUR a l'ecran suivant.
     await page.goto("/checkout")
-    await expect(page.getByText("-89.97 €")).toBeVisible()
-    await expect(page.getByText("269.92 €").first()).toBeVisible()
+    await expect(page.getByText("-89,97 €")).toBeVisible()
+    await expect(page.getByText("269,92 €").first()).toBeVisible()
   })
 
   test("?bug=paiement : l'autorisation renvoie 500 et la commande n'est pas creee", async ({

@@ -10,7 +10,8 @@ export function getCurrency(locale = getLocale()): string {
 
 export function formatPrice(priceEn: number, priceFr: number, locale = getLocale()): string {
   if (locale === "fr") {
-    return `${priceFr.toFixed(2)} €`;
+    // Virgule decimale en francais (cf. formatAmount dans cart-totals.ts).
+    return `${priceFr.toFixed(2).replace(".", ",")} €`;
   }
   return `$${priceEn.toFixed(2)}`;
 }

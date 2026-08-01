@@ -32,6 +32,28 @@ export function PromoCodeForm({ onApplied }: PromoCodeFormProps) {
     onApplied(rate);
   }
 
+  /**
+   * Echec d'application : on repasse en "error" et, SOUS LA PANNE `promo`
+   * UNIQUEMENT, on vide le champ.
+   *
+   * Ce n'est pas une coquetterie : c'est la friction qui transforme un refus en
+   * acharnement. Le visiteur doit retaper "UTMB25" en entier a chaque essai, et
+   * c'est ce qui produit la mediane de 4 clics sur "Appliquer" que la Sentinelle
+   * Ergonomie affiche (dossiers `ergo_field_friction_promo_field_cleared` et
+   * `ergo_rage_click_promo_apply_rejected` de lib/demo/fixtures/ergonomie.ts
+   * cote platform). Sans ce vidage, le dashboard de demo decrit un champ penible
+   * que le site ne montre pas -- l'incoherence se verrait a l'ecran pendant la
+   * demo.
+   *
+   * Hors panne, le comportement nominal du faux site ne bouge pas : la saisie
+   * est conservee, comme sur n'importe quel site correct.
+   */
+  function failApply() {
+    setState("error");
+    applyRate(0);
+    if (bug === "promo") setCode("");
+  }
+
   async function handleApply(e: React.FormEvent) {
     e.preventDefault();
     setState("pending");
@@ -43,8 +65,7 @@ export function PromoCodeForm({ onApplied }: PromoCodeFormProps) {
         signal: AbortSignal.timeout(PROMO_TIMEOUT_MS),
       });
       if (!res.ok) {
-        setState("error");
-        applyRate(0);
+        failApply();
         return;
       }
       const data = (await res.json()) as { applied?: boolean; rate?: number };
@@ -56,6 +77,9 @@ export function PromoCodeForm({ onApplied }: PromoCodeFormProps) {
         applyRate(0);
       }
     } catch {
+      // Deliberement PAS failApply() : un timeout reseau n'est pas la friction
+      // de demo. On signale l'echec sans vider le champ -- le visiteur n'a pas
+      // a retaper son code parce que le reseau a lache.
       setState("error");
       applyRate(0);
     }
