@@ -77,6 +77,9 @@ export function PromoCodeForm({ onApplied }: PromoCodeFormProps) {
         applyRate(0);
       }
     } catch {
+      // Deliberement PAS failApply() : un timeout reseau n'est pas la friction
+      // de demo. On signale l'echec sans vider le champ -- le visiteur n'a pas
+      // a retaper son code parce que le reseau a lache.
       setState("error");
       applyRate(0);
     }

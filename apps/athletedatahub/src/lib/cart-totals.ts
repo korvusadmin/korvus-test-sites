@@ -40,9 +40,11 @@ export function formatAmount(amount: number, locale: Locale): string {
   // Virgule decimale en francais : un site FR qui affiche "569.90 €" se
   // remarque tout de suite en gros plan. On reste sur toFixed (deterministe,
   // pas d'Intl) et on substitue le separateur.
-  return locale === "fr"
-    ? `${amount.toFixed(2).replace(".", ",")} €`
-    : `$${amount.toFixed(2)}`;
+  if (locale !== "fr") return `$${amount.toFixed(2)}`;
+  // Virgule decimale ET espace insecable de milliers : sans elle, un panier a
+  // quatre chiffres s'affichait "1000,00 €" sur un site francais.
+  const [int, dec] = amount.toFixed(2).split(".");
+  return `${int.replace(/\B(?=(\d{3})+(?!\d))/g, "\u00A0")},${dec} €`;
 }
 
 /**

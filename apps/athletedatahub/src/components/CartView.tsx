@@ -90,13 +90,22 @@ export function CartView() {
                 */}
                 <Link href={`/products/${item.slug}`}>
                   <div className="relative w-20 h-20 rounded-lg bg-gray-100 overflow-hidden flex-shrink-0">
-                    <Image
-                      src={item.image}
-                      alt={name}
-                      fill
-                      sizes="80px"
-                      className="object-cover"
-                    />
+                    {/*
+                      Garde sur item.image : le panier est deserialise depuis
+                      localStorage sans validation (CartContext), donc un panier
+                      pose AVANT l'ajout de la vignette n'a pas ce champ.
+                      next/image leve sur un src vide -- la page panier
+                      planterait, et c'est justement l'ecran de la demo.
+                    */}
+                    {item.image ? (
+                      <Image
+                        src={item.image}
+                        alt={name}
+                        fill
+                        sizes="80px"
+                        className="object-cover"
+                      />
+                    ) : null}
                   </div>
                 </Link>
 
