@@ -775,6 +775,23 @@ test.describe("ADH — modes de demo", () => {
     await expect(page.locator("p.size-error")).toHaveCount(0)
   })
 
+  test("le panier affiche la vraie photo de chaque produit", async ({ page }) => {
+    await page.addInitScript((cart) => {
+      localStorage.setItem("adh_cart", JSON.stringify(cart))
+      localStorage.setItem("adh_cookie_consent", "accepted")
+    }, CART_FIXTURE)
+
+    await page.goto("/cart")
+
+    // Une vignette par ligne, servie par l'optimiseur Next depuis l'image du
+    // produit (et pas un placeholder). naturalWidth > 0 prouve que le fichier
+    // a vraiment ete charge : un src casse rendrait 0.
+    const thumb = page.locator("a[href^='/products/'] img").first()
+    await expect(thumb).toBeVisible()
+    await expect(thumb).toHaveAttribute("src", /wetsuit\.png/)
+    expect(await thumb.evaluate((n: HTMLImageElement) => n.naturalWidth)).toBeGreaterThan(0)
+  })
+
   test("?bug=promo : le code promo renvoie 500 et le message s'affiche", async ({
     page,
   }) => {

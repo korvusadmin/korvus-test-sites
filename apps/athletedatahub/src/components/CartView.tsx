@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Trash2, Plus, Minus, ShoppingBag } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { Button } from "@/components/ui/Button";
@@ -77,10 +78,25 @@ export function CartView() {
                 key={item.productId}
                 className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-4"
               >
-                {/* Image placeholder */}
+                {/*
+                  Vraie photo produit, comme la vignette du catalogue
+                  (ProductCard). Le panier affichait un emoji alors que
+                  `item.image` etait deja porte par le CartItem : sur une capture
+                  de demo, trois cartons marron a la place des produits font
+                  maquette, pas boutique.
+
+                  `sizes="80px"` colle a la boite w-20/h-20 : sans lui, Next
+                  sert une image dimensionnee pour le viewport entier.
+                */}
                 <Link href={`/products/${item.slug}`}>
-                  <div className="w-20 h-20 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 text-3xl">
-                    📦
+                  <div className="relative w-20 h-20 rounded-lg bg-gray-100 overflow-hidden flex-shrink-0">
+                    <Image
+                      src={item.image}
+                      alt={name}
+                      fill
+                      sizes="80px"
+                      className="object-cover"
+                    />
                   </div>
                 </Link>
 
