@@ -795,6 +795,63 @@ test.describe("ADH — modes de demo", () => {
     const message = page.locator("p.promo-error")
     await expect(message).toHaveText("Le code promo n'a pas pu être appliqué")
     await expect(message).toHaveAttribute("role", "alert")
+
+    // Le champ se vide : c'est LA friction du scenario de demo (il faut retaper
+    // le code a chaque essai, d'ou l'acharnement sur le bouton). Le dashboard de
+    // demo decrit ce champ penible cote platform ; si ce vidage disparait, la
+    // demo raconte quelque chose que le site ne fait plus.
+    await expect(page.locator("#promo-code")).toHaveValue("")
+  })
+
+  test("?bug=promo : deux essais de suite laissent le message d'erreur et un champ vide", async ({
+    page,
+  }) => {
+    await page.addInitScript((cart) => {
+      localStorage.setItem("adh_cart", JSON.stringify(cart))
+      localStorage.setItem("adh_cookie_consent", "accepted")
+    }, CART_FIXTURE)
+
+    await page.goto("/cart?bug=promo")
+
+    // Deux passages complets saisie -> clic -> 500, comme un visiteur qui
+    // s'acharne. Le second doit se comporter exactement comme le premier (pas
+    // d'etat "pending" colle, pas de message qui disparait).
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await page.fill("#promo-code", "UTMB25")
+      const [response] = await Promise.all([
+        page.waitForResponse((r) => r.url().includes("/api/panier/code-promo")),
+        page.locator("#promo-form button[type=submit]").click(),
+      ])
+      expect(response.status()).toBe(500)
+      await expect(page.locator("p.promo-error")).toBeVisible()
+      await expect(page.locator("#promo-code")).toHaveValue("")
+    }
+
+    // Aucune remise n'a ete appliquee : le total reste le sous-total du panier.
+    await expect(page.locator("p.promo-feedback.text-green-700")).toHaveCount(0)
+  })
+
+  test("sans panne : la saisie du code promo est conservee apres un echec", async ({
+    page,
+  }) => {
+    await page.addInitScript((cart) => {
+      localStorage.setItem("adh_cart", JSON.stringify(cart))
+      localStorage.setItem("adh_cookie_consent", "accepted")
+    }, CART_FIXTURE)
+
+    await page.goto("/cart")
+    // Code inconnu -> 200 { applied: false } : un refus normal, hors panne. Le
+    // site doit alors se comporter correctement et GARDER la saisie -- le
+    // vidage est une friction reservee au scenario de demo.
+    await page.fill("#promo-code", "CODEBIDON")
+
+    await Promise.all([
+      page.waitForResponse((r) => r.url().includes("/api/panier/code-promo")),
+      page.locator("#promo-form button[type=submit]").click(),
+    ])
+
+    await expect(page.locator("p.promo-error")).toBeVisible()
+    await expect(page.locator("#promo-code")).toHaveValue("CODEBIDON")
   })
 
   test("sans panne : le meme code promo s'applique et remise le panier", async ({
