@@ -65,3 +65,22 @@ doomcheck.me {
 www.doomcheck.me {
 	redir https://doomcheck.me{uri} permanent
 }
+
+# --- virginiaphilippe.com ---
+#
+# Site client, deploye hors de ce depot : son code vit dans
+# github.com/Virginiaphilippe/website et son conteneur dans /opt/virginia.
+# Seul le routage est ici, et il n'a pas le choix : le deploiement de ce
+# depot recopie ce Caddyfile par-dessus /opt/caddy/Caddyfile. Un bloc ajoute
+# a la main sur le serveur tiendrait jusqu'au prochain push d'infra, puis le
+# domaine tomberait sans cause visible.
+virginiaphilippe.com {
+	encode gzip zstd
+	reverse_proxy virginia:3000 {
+		trusted_proxies private_ranges
+	}
+}
+
+www.virginiaphilippe.com {
+	redir https://virginiaphilippe.com{uri} permanent
+}
