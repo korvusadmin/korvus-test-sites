@@ -157,12 +157,9 @@ test.describe("Test 5 — request_error", () => {
     expect(err500!.payload.status_code).toBe(500)
   })
 
-  test("captures timeout error (chaos endpoint 15s > snippet threshold 10s)", async ({
+  test("classifies a status-0 network failure after 10s as timeout", async ({
     page,
   }) => {
-    // This test waits ~16s for the slow endpoint to respond
-    test.setTimeout(30_000)
-
     const interceptor = new IngestInterceptor(page)
     await interceptor.attach()
     await injectSnippet(page, "doomcheck")
@@ -170,13 +167,42 @@ test.describe("Test 5 — request_error", () => {
     await page.goto("/")
     await page.waitForTimeout(500)
 
-    // Fire and forget — server responds after 15s
+    // Keep the request pending while Playwright advances the browser clock.
+    // This exercises the real fetch wrapper and collector without paying 10s
+    // of wall-clock time on every browser in the CI matrix.
+    let releaseNetworkFailure!: () => void
+    const networkFailureReleased = new Promise<void>((resolve) => {
+      releaseNetworkFailure = resolve
+    })
+    let markRequestIntercepted!: () => void
+    const requestIntercepted = new Promise<void>((resolve) => {
+      markRequestIntercepted = resolve
+    })
+    let markRequestFailed!: () => void
+    const requestFailed = new Promise<void>((resolve) => {
+      markRequestFailed = resolve
+    })
+
+    await page.route("**/api/chaos/timeout", async (route: Route) => {
+      markRequestIntercepted()
+      await networkFailureReleased
+      await route.abort("timedout")
+      markRequestFailed()
+    })
+    await page.clock.install()
+
     await page.evaluate(() => {
       fetch("/api/chaos/timeout").catch(() => {})
     })
+    await requestIntercepted
 
-    // Wait for the response to come back (15s + margin)
-    await page.waitForTimeout(16_000)
+    await page.clock.fastForward(10_001)
+    releaseNetworkFailure()
+    await requestFailed
+    // Let the fetch rejection propagate through the snippet's chained catch.
+    await page.evaluate(
+      () => new Promise<void>((resolve) => queueMicrotask(() => queueMicrotask(resolve))),
+    )
 
     await interceptor.triggerFlush()
 
@@ -185,7 +211,10 @@ test.describe("Test 5 — request_error", () => {
       (e.payload.url_path as string).includes("/api/chaos/timeout"),
     )
     expect(timeout, "request_error with timeout should be captured").toBeDefined()
+    expect(timeout!.payload.status_code).toBe(0)
+    expect(timeout!.payload.duration_ms).toBeGreaterThan(10_000)
     expect(timeout!.payload.error_type).toBe("timeout")
+    expect(timeout!.payload.initiator_type).toBe("fetch")
   })
 
   test("filters analytics domain errors (deny-list)", async ({ page }) => {

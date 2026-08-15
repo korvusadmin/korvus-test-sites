@@ -14,11 +14,14 @@ import path from "node:path"
  */
 
 const ROOT = path.resolve(__dirname, "..", "..")
-const DIST = path.join(ROOT, "platform", "snippet", "dist", "korvus.min.js")
-const SNIPPET_SRC = path.join(ROOT, "platform", "snippet", "src")
+const PLATFORM_ROOT = process.env.KORVUS_PLATFORM_ROOT
+  ? path.resolve(process.env.KORVUS_PLATFORM_ROOT)
+  : path.join(ROOT, "platform")
+const DIST = path.join(PLATFORM_ROOT, "snippet", "dist", "korvus.min.js")
+const SNIPPET_SRC = path.join(PLATFORM_ROOT, "snippet", "src")
 // Le build inline les patterns multilingues via esbuild, donc un changement
 // dans lib/patterns/** invalide aussi le dist.
-const PATTERNS_SRC = path.join(ROOT, "platform", "lib", "patterns")
+const PATTERNS_SRC = path.join(PLATFORM_ROOT, "lib", "patterns")
 
 function walkMaxMtime(dir: string): number {
   if (!fs.existsSync(dir)) return 0

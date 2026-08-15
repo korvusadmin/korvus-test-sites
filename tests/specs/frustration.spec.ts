@@ -16,8 +16,9 @@ import { injectSnippet } from "../helpers/inject-snippet"
 // de fixture sont injectes dynamiquement : les collecteurs frustration /
 // field_friction ecoutent en delegation sur document, donc ils captent les
 // noeuds ajoutes apres le boot (contrairement a add_to_cart qui lit le DOM une
-// fois a l'init). On laisse 600ms apres le clic pour que le timer dead_click
-// (500ms, pas de navigation = pas de reponse forte) tire.
+// fois a l'init). L'horloge Playwright avance virtuellement jusqu'a la fin de
+// la fenetre dead_click (1200ms) : le vrai timer du bundle tire sans imposer
+// cette attente sur chaque moteur de la matrice CI.
 //
 // Clics DISPATCHES programmatiquement (MouseEvent bubblant via page.evaluate),
 // PAS page.click : le snippet ecoute en delegation capture-phase sur document,
@@ -28,7 +29,7 @@ import { injectSnippet } from "../helpers/inject-snippet"
 // dans .claude/rules/tests-snippet.md (custom elements / delegated click).
 
 const BOOT_MS = 600
-const DEAD_CLICK_MS = 700
+const DEAD_CLICK_WINDOW_MS = 1_200
 
 test.describe("C0b.1/.2 — cursor:pointer + bucket de taille au clic", () => {
   test("fausse affordance (div cursor:pointer inerte) -> cursor_pointer:true, taille adequate, dom_responded:false", async ({
@@ -39,6 +40,7 @@ test.describe("C0b.1/.2 — cursor:pointer + bucket de taille au clic", () => {
     await injectSnippet(page, "doomcheck")
     await page.goto("/")
     await page.waitForTimeout(BOOT_MS)
+    await page.clock.install()
 
     // Div qui A L'AIR cliquable (cursor:pointer) mais NE FAIT RIEN (aucun
     // handler, aucune mutation). Taille >= 44px -> bucket adequate.
@@ -51,7 +53,7 @@ test.describe("C0b.1/.2 — cursor:pointer + bucket de taille au clic", () => {
       document.body.appendChild(d)
       d.dispatchEvent(new MouseEvent("click", { bubbles: true }))
     })
-    await page.waitForTimeout(DEAD_CLICK_MS)
+    await page.clock.fastForward(DEAD_CLICK_WINDOW_MS)
     await interceptor.triggerFlush()
 
     const events = interceptor.getEvents("frustration_detected")
@@ -60,6 +62,7 @@ test.describe("C0b.1/.2 — cursor:pointer + bucket de taille au clic", () => {
     expect(dead!.payload.cursor_pointer).toBe(true)
     expect(dead!.payload.target_size_bucket).toBe("adequate")
     expect(dead!.payload.dom_responded).toBe(false)
+    expect(dead!.payload.window_ms).toBe(DEAD_CLICK_WINDOW_MS)
     // CNIL : pas de px brut, pas de coordonnees.
     expect(dead!.payload).not.toHaveProperty("width")
     expect(dead!.payload).not.toHaveProperty("client_x")
@@ -73,6 +76,7 @@ test.describe("C0b.1/.2 — cursor:pointer + bucket de taille au clic", () => {
     await injectSnippet(page, "doomcheck")
     await page.goto("/")
     await page.waitForTimeout(BOOT_MS)
+    await page.clock.install()
 
     await page.evaluate(() => {
       const b = document.createElement("button")
@@ -82,7 +86,7 @@ test.describe("C0b.1/.2 — cursor:pointer + bucket de taille au clic", () => {
       document.body.appendChild(b)
       b.dispatchEvent(new MouseEvent("click", { bubbles: true }))
     })
-    await page.waitForTimeout(DEAD_CLICK_MS)
+    await page.clock.fastForward(DEAD_CLICK_WINDOW_MS)
     await interceptor.triggerFlush()
 
     const dead = interceptor
@@ -91,6 +95,7 @@ test.describe("C0b.1/.2 — cursor:pointer + bucket de taille au clic", () => {
     expect(dead, "un dead_click doit etre emis sur la petite cible").toBeTruthy()
     expect(dead!.payload.target_size_bucket).toBe("tiny")
     expect(dead!.payload.cursor_pointer).toBe(true)
+    expect(dead!.payload.window_ms).toBe(DEAD_CLICK_WINDOW_MS)
   })
 })
 

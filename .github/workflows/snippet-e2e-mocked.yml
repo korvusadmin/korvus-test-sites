@@ -1,4 +1,5 @@
 name: Snippet E2E (mocked)
+run-name: snippet-e2e ${{ inputs.platform_ref || github.sha }}
 
 # Audit 2026-04 — Vague 2 / Worker B1.
 # Runs the ~13 Playwright specs in tests/specs/ against doomcheck +
@@ -20,15 +21,12 @@ on:
       - "!tests/specs/athletedatahub.spec.ts"
       - "apps/doomcheck/**"
       - "apps/floral-nuxt/**"
-  push:
-    branches: [main]
-    paths:
-      - "tests/**"
-      - "!tests/specs/athletedatahub.spec.ts"
-      - "apps/doomcheck/**"
-      - "apps/floral-nuxt/**"
-  repository_dispatch:
-    types: [snippet-changed]
+      - ".github/workflows/snippet-e2e-mocked.yml"
+  # Une derive cross-browser reste detectee sans payer cinq jobs a chaque
+  # merge. Les releases, elles, declenchent ce gate explicitement et attendent
+  # son resultat depuis platform/.github/workflows/snippet.yml.
+  schedule:
+    - cron: "17 3 * * 1"
   workflow_dispatch:
     inputs:
       platform_ref:
@@ -83,7 +81,7 @@ jobs:
           repository: KorvusFR/korvus
           path: platform
           token: ${{ secrets.KORVUS_PLATFORM_PAT }}
-          ref: ${{ github.event.client_payload.platform_sha || github.event.inputs.platform_ref || 'main' }}
+          ref: ${{ github.event.inputs.platform_ref || 'main' }}
 
       - name: Setup Node 24
         uses: actions/setup-node@v4

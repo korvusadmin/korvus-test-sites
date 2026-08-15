@@ -7,13 +7,6 @@ on:
       - "apps/athletedatahub/**"
       - "tests/specs/athletedatahub.spec.ts"
       - ".github/workflows/athletedatahub-e2e.yml"
-  push:
-    branches: [main]
-    paths:
-      - "apps/athletedatahub/**"
-      - "tests/specs/athletedatahub.spec.ts"
-      - ".github/workflows/athletedatahub-e2e.yml"
-
 concurrency:
   group: athletedatahub-e2e-${{ github.ref }}
   cancel-in-progress: true

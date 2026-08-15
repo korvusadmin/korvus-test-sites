@@ -10,6 +10,7 @@ const adh = getSiteConfig("athletedatahub")
 test.describe("ADH — proof capture diagnostic", () => {
   test("serves the proof bundles and configures the probe before the snippet", async ({
     page,
+    context,
     request,
   }) => {
     const [snippetResponse, proofResponse] = await Promise.all([
@@ -65,8 +66,11 @@ test.describe("ADH — proof capture diagnostic", () => {
       probeReady: true,
     })
 
-    await page.goto("/")
-    const regularVisit = await page.evaluate(() => {
+    // Une page neuve isole la visite reguliere du reload HMR que Next dev peut
+    // encore terminer sur la page diagnostic, surtout sous WebKit.
+    const regularPage = await context.newPage()
+    await regularPage.goto("/")
+    const regularVisit = await regularPage.evaluate(() => {
       const w = window as typeof window & {
         __korvus?: {
           endpoint?: string
@@ -911,7 +915,10 @@ test.describe("ADH — modes de demo", () => {
 
     // Sans persistance, le checkout recalculait sur le prix plein : le visiteur
     // voyait 269,92 EUR au panier puis 359,90 EUR a l'ecran suivant.
-    await page.goto("/checkout")
+    // Emprunte le vrai parcours visiteur : le clic attend la navigation du
+    // routeur et ne court pas contre son refresh tardif apres la promo.
+    await page.getByRole("link", { name: "Passer commande" }).click()
+    await expect(page).toHaveURL(/\/checkout$/)
     await expect(page.getByText("-89,97 €")).toBeVisible()
     await expect(page.getByText("269,92 €").first()).toBeVisible()
   })
@@ -1059,15 +1066,13 @@ interface PolicyRule {
 // par valider des selecteurs qui ne revelent plus rien.
 //
 // On lit desormais le JSON de `platform`, qui est ce que le workflow
-// proof-policies.yml publie sur le CDN. Meme resolution de chemin que
-// SNIPPET_DIST_PATH dans performance.spec.ts : le workflow checkout `platform`
-// a cote de `test_website`.
-const POLICY_FILE = path.resolve(
-  __dirname,
-  "..",
-  "..",
-  "..",
-  "platform",
+// proof-policies.yml publie sur le CDN. Le chemin explicite rend le test
+// portable dans un worktree ; le checkout voisin reste le fallback CI/local.
+const PLATFORM_ROOT = process.env.KORVUS_PLATFORM_ROOT
+  ? path.resolve(process.env.KORVUS_PLATFORM_ROOT)
+  : path.resolve(__dirname, "..", "..", "..", "platform")
+const POLICY_FILE = path.join(
+  PLATFORM_ROOT,
   "config",
   "proof-policies",
   "demo-korvus-fr.json",
