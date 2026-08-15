@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test"
+import { test, expect, type Page } from "@playwright/test"
 import { IngestInterceptor } from "../helpers/ingest-interceptor"
 import { injectSnippet, getSiteConfig } from "../helpers/inject-snippet"
 
@@ -6,6 +6,18 @@ import { injectSnippet, getSiteConfig } from "../helpers/inject-snippet"
 // Only tests that DIFFER from doomcheck — site-specific behaviors
 
 const adh = getSiteConfig("athletedatahub")
+
+async function gotoAfterDevReload(page: Page, url: string): Promise<void> {
+  const expectedUrl = new URL(url, page.url()).href
+  // Next dev peut imposer un unique full reload lorsqu'un autre worker vient
+  // de compiler une route. WebKit refuse alors la navigation concurrente. On
+  // ne tolere que cette fenetre d'infrastructure : chaque tentative doit finir
+  // exactement sur l'URL demandee, dans une borne courte.
+  await expect(async () => {
+    await page.goto(url)
+    expect(page.url()).toBe(expectedUrl)
+  }).toPass({ timeout: 10_000, intervals: [250, 500, 1_000] })
+}
 
 test.describe("ADH — proof capture diagnostic", () => {
   test("serves the proof bundles and configures the probe before the snippet", async ({
@@ -987,7 +999,7 @@ test.describe("ADH — modes de demo", () => {
 
     // Le mode colle sans reporter le parametre, pour que la page precedente
     // entre dans le film.
-    await page.goto("/cart")
+    await gotoAfterDevReload(page, "/cart")
     const second = await page.evaluate(() => {
       const w = window as typeof window & {
         __korvus?: { enableProofCapture?: boolean; proofPolicyId?: string }
@@ -1012,7 +1024,7 @@ test.describe("ADH — modes de demo", () => {
 
     await page.goto("/?film=1")
     const first = await page.evaluate(() => sessionStorage.getItem("korvus_sid"))
-    await page.goto("/?film=new")
+    await gotoAfterDevReload(page, "/?film=new")
     const second = await page.evaluate(() => sessionStorage.getItem("korvus_sid"))
 
     expect(second).toMatch(UUID_V4)
