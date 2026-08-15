@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test"
+import { test, expect, type Page } from "@playwright/test"
 import { IngestInterceptor } from "../helpers/ingest-interceptor"
 import { injectSnippet, getSiteConfig } from "../helpers/inject-snippet"
 
@@ -7,9 +7,22 @@ import { injectSnippet, getSiteConfig } from "../helpers/inject-snippet"
 
 const adh = getSiteConfig("athletedatahub")
 
+async function gotoAfterDevReload(page: Page, url: string): Promise<void> {
+  const expectedUrl = new URL(url, page.url()).href
+  // Next dev peut imposer un unique full reload lorsqu'un autre worker vient
+  // de compiler une route. WebKit refuse alors la navigation concurrente. On
+  // ne tolere que cette fenetre d'infrastructure : chaque tentative doit finir
+  // exactement sur l'URL demandee, dans une borne courte.
+  await expect(async () => {
+    await page.goto(url)
+    expect(page.url()).toBe(expectedUrl)
+  }).toPass({ timeout: 10_000, intervals: [250, 500, 1_000] })
+}
+
 test.describe("ADH — proof capture diagnostic", () => {
   test("serves the proof bundles and configures the probe before the snippet", async ({
     page,
+    context,
     request,
   }) => {
     const [snippetResponse, proofResponse] = await Promise.all([
@@ -65,8 +78,11 @@ test.describe("ADH — proof capture diagnostic", () => {
       probeReady: true,
     })
 
-    await page.goto("/")
-    const regularVisit = await page.evaluate(() => {
+    // Une page neuve isole la visite reguliere du reload HMR que Next dev peut
+    // encore terminer sur la page diagnostic, surtout sous WebKit.
+    const regularPage = await context.newPage()
+    await regularPage.goto("/")
+    const regularVisit = await regularPage.evaluate(() => {
       const w = window as typeof window & {
         __korvus?: {
           endpoint?: string
@@ -911,7 +927,10 @@ test.describe("ADH — modes de demo", () => {
 
     // Sans persistance, le checkout recalculait sur le prix plein : le visiteur
     // voyait 269,92 EUR au panier puis 359,90 EUR a l'ecran suivant.
-    await page.goto("/checkout")
+    // Emprunte le vrai parcours visiteur : le clic attend la navigation du
+    // routeur et ne court pas contre son refresh tardif apres la promo.
+    await page.getByRole("link", { name: "Passer commande" }).click()
+    await expect(page).toHaveURL(/\/checkout$/)
     await expect(page.getByText("-89,97 €")).toBeVisible()
     await expect(page.getByText("269,92 €").first()).toBeVisible()
   })
@@ -980,7 +999,7 @@ test.describe("ADH — modes de demo", () => {
 
     // Le mode colle sans reporter le parametre, pour que la page precedente
     // entre dans le film.
-    await page.goto("/cart")
+    await gotoAfterDevReload(page, "/cart")
     const second = await page.evaluate(() => {
       const w = window as typeof window & {
         __korvus?: { enableProofCapture?: boolean; proofPolicyId?: string }
@@ -1005,7 +1024,7 @@ test.describe("ADH — modes de demo", () => {
 
     await page.goto("/?film=1")
     const first = await page.evaluate(() => sessionStorage.getItem("korvus_sid"))
-    await page.goto("/?film=new")
+    await gotoAfterDevReload(page, "/?film=new")
     const second = await page.evaluate(() => sessionStorage.getItem("korvus_sid"))
 
     expect(second).toMatch(UUID_V4)
@@ -1059,15 +1078,13 @@ interface PolicyRule {
 // par valider des selecteurs qui ne revelent plus rien.
 //
 // On lit desormais le JSON de `platform`, qui est ce que le workflow
-// proof-policies.yml publie sur le CDN. Meme resolution de chemin que
-// SNIPPET_DIST_PATH dans performance.spec.ts : le workflow checkout `platform`
-// a cote de `test_website`.
-const POLICY_FILE = path.resolve(
-  __dirname,
-  "..",
-  "..",
-  "..",
-  "platform",
+// proof-policies.yml publie sur le CDN. Le chemin explicite rend le test
+// portable dans un worktree ; le checkout voisin reste le fallback CI/local.
+const PLATFORM_ROOT = process.env.KORVUS_PLATFORM_ROOT
+  ? path.resolve(process.env.KORVUS_PLATFORM_ROOT)
+  : path.resolve(__dirname, "..", "..", "..", "platform")
+const POLICY_FILE = path.join(
+  PLATFORM_ROOT,
   "config",
   "proof-policies",
   "demo-korvus-fr.json",

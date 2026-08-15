@@ -24,11 +24,11 @@ async function simulateAxeptio(page: Page, granted: boolean): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// promo_code_rejected
+// promo_attempted — site custom, decision serveur
 // ---------------------------------------------------------------------------
 
-test.describe("Worker B4.4 — promo_code_rejected", () => {
-  test("submit code promo invalide + message DOM 'promo invalide' → promo_code_rejected", async ({
+test.describe("Worker B4.4 — promo_attempted custom", () => {
+  test("submit code promo invalide + message DOM → tentative brute avec signal de rejet", async ({
     page,
   }) => {
     const interceptor = new IngestInterceptor(page)
@@ -74,18 +74,23 @@ test.describe("Worker B4.4 — promo_code_rejected", () => {
       input.parentElement?.appendChild(errorMsg)
     })
 
-    await page.waitForTimeout(800)
+    // Sur un site custom, le snippet attend 1500 ms puis emet les signaux
+    // bruts ; le serveur decide ensuite accepte/rejete.
+    await page.waitForTimeout(1600)
     await interceptor.triggerFlush()
 
-    const events = interceptor.getEvents("promo_code_rejected")
+    const events = interceptor.getEvents("promo_attempted")
     expect(
       events.length,
-      "promo_code_rejected devrait être émis",
+      "promo_attempted devrait être émis sur un site custom",
     ).toBeGreaterThan(0)
     expect(events[0].payload.promo_code).toBe("EXPIRED2024")
-    const rejectionText = String(events[0].payload.rejection_text || "")
+    expect(events[0].payload.source).toBe("custom_generic")
+    expect(events[0].payload.reject_signal).toBe(true)
+    const rejectionText = String(events[0].payload.reject_text || "")
     expect(rejectionText.length).toBeGreaterThan(0)
     expect(rejectionText.toLowerCase()).toMatch(/invalide|expir/)
+    expect(interceptor.getEvents("promo_code_rejected")).toHaveLength(0)
   })
 })
 

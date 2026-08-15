@@ -4,6 +4,14 @@ import { injectSnippet } from "../helpers/inject-snippet"
 
 // All tests run on doomcheck (port 3003)
 
+// 440 garde le message sous la limite ingest de 500 caracteres tout en
+// garantissant > 48 KB meme sous WebKit, dont les stacks sont plus courtes.
+const OVERFLOW_MESSAGE_FILLER = "x".repeat(440)
+
+function overflowMessage(index: number): string {
+  return `Overflow error ${index} ${OVERFLOW_MESSAGE_FILLER}`
+}
+
 // ---------------------------------------------------------------------------
 // Test 19 — Batching
 // ---------------------------------------------------------------------------
@@ -199,7 +207,7 @@ test.describe("Test 20 — Buffer overflow", () => {
   // le reste perdu en silence. L'ancienne assertion `events.length <= 100`
   // (cap reel = 50) ne testait RIEN -> le bug vivait derriere un test vert.
   //
-  // Invariant fort teste ici : un gros flush (50 events distincts ~128 KB,
+  // Invariant fort teste ici : un gros flush (50 events distincts > 48 KB,
   // bien au-dessus du budget keepalive 48 KB) livre les 50 plus recents
   // (fenetre [100..149]) avec ZERO perte et ZERO doublon, et ne laisse rien
   // dans la retry queue. Le flush anticipe (4.B) peut en plus rescuer des
@@ -228,24 +236,34 @@ test.describe("Test 20 — Buffer overflow", () => {
     await page.goto("/")
     await page.waitForTimeout(500)
 
-    // 150 erreurs DISTINCTES (signature unique -> chacune porte un snapshot
-    // breadcrumbs a sa 1ere occurrence -> batch lourd). Le cap MAX_EVENTS=50
-    // garde les 50 plus recentes = [100..149]. Pas de blocage de l'endpoint :
-    // on laisse le snippet livrer naturellement (flush anticipe eventuel +
-    // flush final), on verifie ensuite l'invariant lossless sur la fenetre.
+    // Le flush anticipe a 40 KB est volontairement desactive sur page cachee :
+    // c'est le vrai scenario unload que ce test doit couvrir. Le flush final
+    // devra donc decouper le batch sous KEEPALIVE_BUDGET=48 KB.
     await page.evaluate(() => {
+      Object.defineProperty(document, "visibilityState", {
+        value: "hidden",
+        writable: true,
+        configurable: true,
+      })
+    })
+
+    // 150 erreurs DISTINCTES et realistes (message < 500 caracteres, la borne
+    // du schema ingest). Le cap MAX_EVENTS=50 garde les 50 plus recentes =
+    // [100..149], dont le payload cumule depasse deterministement 48 KB.
+    await page.evaluate((filler) => {
       for (let i = 0; i < 150; i++) {
+        const message = `Overflow error ${i} ${filler}`
         window.dispatchEvent(
           new ErrorEvent("error", {
-            message: `Overflow error ${i}`,
+            message,
             filename: "test.js",
             lineno: i,
             colno: 0,
-            error: new Error(`Overflow error ${i}`),
+            error: new Error(message),
           }),
         )
       }
-    })
+    }, OVERFLOW_MESSAGE_FILLER)
 
     // Flush final : visibilitychange -> hidden (le snippet flush le buffer).
     await page.evaluate(() => {
@@ -261,7 +279,7 @@ test.describe("Test 20 — Buffer overflow", () => {
     // soient tous arrives (chunks multiples inclus), pas un sleep arbitraire.
     const windowMessages = Array.from(
       { length: 50 },
-      (_, k) => `Overflow error ${100 + k}`,
+      (_, k) => overflowMessage(100 + k),
     )
     await interceptor.waitForEventMessages(windowMessages, 20_000)
 
@@ -273,13 +291,13 @@ test.describe("Test 20 — Buffer overflow", () => {
       expect(
         messages,
         `event "Overflow error ${i}" doit etre present (0 perte sur la fenetre finale)`,
-      ).toContain(`Overflow error ${i}`)
+      ).toContain(overflowMessage(i))
     }
 
     // 2) ZERO doublon : chaque event de la fenetre arrive exactement une fois
     // (pas de double-send entre chunks / retry).
     for (let i = 100; i < 150; i++) {
-      const msg = `Overflow error ${i}`
+      const msg = overflowMessage(i)
       expect(
         messages.filter((m) => m === msg).length,
         `event "${msg}" ne doit arriver qu'une fois`,
@@ -301,11 +319,10 @@ test.describe("Test 20 — Buffer overflow", () => {
     })
     expect(retryQueueEvents, "retry queue doit etre vide apres flush").toBe(0)
 
-    // 4) Robustesse anti-vacuite (4.F.4) : la fenetre [100..149] doit reellement
-    // peser plus que le budget keepalive (48 KB) -> le chemin overflow/chunking
-    // a bien ete exerce. Si un futur rendu doomcheck rapetissait les events au
-    // point que tout tienne en 1 requete, ce test echoue franchement au lieu
-    // de devenir un faux-vert. KEEPALIVE_BUDGET = 48_000 (cf. transport.ts).
+    // 4) Robustesse anti-vacuite (4.F.4) : le payload logique doit depasser
+    // 48 KB ET arriver dans plusieurs POST, chacun sous le budget. Mesurer les
+    // requetes capturees prouve le chemin de decoupe, pas seulement la taille
+    // theorique des events avant leur enveloppe reseau.
     const windowBytes = events
       .filter((e) => windowMessages.includes(e.payload.message as string))
       .reduce((sum, e) => sum + JSON.stringify(e).length, 0)
@@ -313,6 +330,22 @@ test.describe("Test 20 — Buffer overflow", () => {
       windowBytes,
       "la fenetre [100..149] doit depasser le budget keepalive (sinon le test n'exerce plus l'overflow)",
     ).toBeGreaterThan(48_000)
+
+    const overflowBatches = interceptor.getAllBatches().filter((batch) =>
+      batch.events.some((event) =>
+        windowMessages.includes(event.payload.message as string),
+      ),
+    )
+    expect(
+      overflowBatches.length,
+      "le payload overflow doit etre decoupe en plusieurs POST",
+    ).toBeGreaterThan(1)
+    for (const batch of overflowBatches) {
+      expect(
+        new Blob([JSON.stringify(batch)]).size,
+        "chaque POST decoupe doit respecter KEEPALIVE_BUDGET",
+      ).toBeLessThanOrEqual(48_000)
+    }
   })
 })
 

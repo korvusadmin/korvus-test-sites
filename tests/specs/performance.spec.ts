@@ -198,27 +198,75 @@ test.describe("Test 1 — Impact Core Web Vitals", () => {
 interface FetchResult {
   url: string
   status: number
+  body: string
   bodyLength: number
   contentType: string
   ok: boolean
   errorMessage?: string
 }
 
-const FETCH_CASES = [
-  { url: "/", method: "GET" },
-  { url: "/catalog", method: "GET" },
-  { url: "/products/novapro-x12", method: "GET" },
-  { url: "/api/chaos/error", method: "GET" },
-  { url: "/nonexistent-test-url-12345", method: "GET" },
-]
+interface FetchFixture {
+  status: number
+  contentType: string
+  body: string
+}
+
+const FETCH_FIXTURES: Record<string, FetchFixture> = {
+  "/__fetch-integrity/json": {
+    status: 200,
+    contentType: "application/json; charset=utf-8",
+    body: JSON.stringify({ message: "stable", items: [1, 2, 3] }),
+  },
+  "/__fetch-integrity/unicode": {
+    status: 200,
+    contentType: "text/plain; charset=utf-8",
+    body: "Korvus — été 🐦\nligne 2",
+  },
+  "/__fetch-integrity/empty": {
+    status: 204,
+    contentType: "text/plain; charset=utf-8",
+    body: "",
+  },
+  "/__fetch-integrity/not-found": {
+    status: 404,
+    contentType: "text/plain; charset=utf-8",
+    body: "fixture not found",
+  },
+  "/__fetch-integrity/server-error": {
+    status: 500,
+    contentType: "application/problem+json; charset=utf-8",
+    body: JSON.stringify({ error: "deterministic failure" }),
+  },
+}
+
+const FETCH_CASES = Object.keys(FETCH_FIXTURES).map((url) => ({
+  url,
+  method: "GET",
+}))
+
+async function installFetchIntegrityFixtures(page: Page): Promise<void> {
+  await page.route("**/__fetch-integrity/**", async (route) => {
+    const pathname = new URL(route.request().url()).pathname
+    const fixture = FETCH_FIXTURES[pathname]
+    if (!fixture) {
+      await route.abort("failed")
+      return
+    }
+
+    await route.fulfill({
+      status: fixture.status,
+      headers: fixture.contentType
+        ? { "Content-Type": fixture.contentType }
+        : {},
+      body: fixture.body,
+    })
+  })
+}
 
 test.describe("Test 2 — Fetch integrity", () => {
   async function runFetchSuite(
     page: Page,
   ): Promise<FetchResult[]> {
-    // Wait for page load + snippet boot (if present)
-    await page.waitForTimeout(2000)
-
     return page.evaluate(
       async (cases: { url: string; method: string }[]) => {
         const results: FetchResult[] = []
@@ -229,6 +277,7 @@ test.describe("Test 2 — Fetch integrity", () => {
             results.push({
               url: c.url,
               status: res.status,
+              body,
               bodyLength: body.length,
               contentType: res.headers.get("content-type") ?? "",
               ok: res.ok,
@@ -237,6 +286,7 @@ test.describe("Test 2 — Fetch integrity", () => {
             results.push({
               url: c.url,
               status: 0,
+              body: "",
               bodyLength: 0,
               contentType: "",
               ok: false,
@@ -257,6 +307,7 @@ test.describe("Test 2 — Fetch integrity", () => {
     // --- WITHOUT snippet ---
     const pageWithout = await context.newPage()
     await blockNativeSnippet(pageWithout)
+    await installFetchIntegrityFixtures(pageWithout)
     await pageWithout.goto("/")
     const resultsWithout = await runFetchSuite(pageWithout)
     await pageWithout.close()
@@ -264,6 +315,7 @@ test.describe("Test 2 — Fetch integrity", () => {
     // --- WITH snippet ---
     const pageWith = await context.newPage()
     await injectSnippet(pageWith, "doomcheck")
+    await installFetchIntegrityFixtures(pageWith)
     await pageWith.goto("/")
     const resultsWith = await runFetchSuite(pageWith)
     await pageWith.close()
@@ -274,6 +326,14 @@ test.describe("Test 2 — Fetch integrity", () => {
     for (let i = 0; i < resultsWithout.length; i++) {
       const without = resultsWithout[i]
       const withSnippet = resultsWith[i]
+      const fixture = FETCH_FIXTURES[without.url]
+
+      expect(fixture, `Fetch ${without.url}: fixture should exist`).toBeDefined()
+      expect(without.status).toBe(fixture.status)
+      expect(without.body).toBe(fixture.body)
+      expect(without.contentType.split(";", 1)[0]).toBe(
+        fixture.contentType.split(";", 1)[0],
+      )
 
       expect(
         withSnippet.status,
@@ -286,9 +346,19 @@ test.describe("Test 2 — Fetch integrity", () => {
       ).toBe(without.bodyLength)
 
       expect(
+        withSnippet.body,
+        `Fetch ${without.url}: decoded body should match exactly`,
+      ).toBe(without.body)
+
+      expect(
         withSnippet.contentType,
         `Fetch ${without.url}: content-type should match`,
       ).toBe(without.contentType)
+
+      expect(
+        withSnippet.ok,
+        `Fetch ${without.url}: ok should match`,
+      ).toBe(without.ok)
     }
   })
 
@@ -574,16 +644,18 @@ test.describe("Test 3 — Crash isolation", () => {
 //   locaux ne remplacent PAS cette instrumentation — ils attrapent
 //   uniquement une régression grossière au niveau du snippet lui-même.
 
-const SNIPPET_DIST_PATH = path.resolve(
-  __dirname,
-  "..",
-  "..",
-  "..",
-  "platform",
-  "snippet",
-  "dist",
-  "korvus.min.js",
-)
+const SNIPPET_DIST_PATH = process.env.KORVUS_SNIPPET_PATH
+  ? path.resolve(process.env.KORVUS_SNIPPET_PATH)
+  : path.resolve(
+      __dirname,
+      "..",
+      "..",
+      "..",
+      "platform",
+      "snippet",
+      "dist",
+      "korvus.min.js",
+    )
 
 // Gate 1 = contrat dur. Les deux autres sont des smoke tests anti-catastrophe.
 const MAX_GZIP_BYTES = 110 * 1024 // 110 KB — hard contract

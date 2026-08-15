@@ -151,15 +151,21 @@ test.describe("V2 — promo_applied (source: dom)", () => {
 })
 
 // ---------------------------------------------------------------------------
-// promo_code_rejected — exempt
+// promo_code_rejected — plateforme connue, exempt
 // ---------------------------------------------------------------------------
 
 test.describe("V2 — promo_code_rejected", () => {
-  test("form submit + error keyword → promo_code_rejected émis", async ({
+  test("Shopify: form submit + error keyword → promo_code_rejected émis", async ({
     page,
   }) => {
     const interceptor = new IngestInterceptor(page)
     await interceptor.attach()
+    // Le contrat direct promo_code_rejected appartient aux plateformes
+    // reconnues. Doomcheck est custom par defaut : on simule le global Shopify
+    // avant le boot pour exercer explicitement cette branche.
+    await page.addInitScript(() => {
+      ;(window as Window & { Shopify?: Record<string, never> }).Shopify = {}
+    })
     await injectSnippet(page, {
       ...doomcheck,
     })

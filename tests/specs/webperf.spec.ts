@@ -183,6 +183,7 @@ test.describe("Test 9 — scripts_hash", () => {
 
   test("scripts_hash changes when a new script is present", async ({
     page,
+    context,
   }) => {
     const interceptor = new IngestInterceptor(page)
     await interceptor.attach()
@@ -196,21 +197,23 @@ test.describe("Test 9 — scripts_hash", () => {
     const hash1 = interceptor.getPageviews()[0].scripts_hash
     expect(hash1).toBeTruthy()
 
-    // Add an init script that injects an extra <script src> into the DOM.
-    // It will be present on the next full navigation, changing the hash.
-    await page.addInitScript(() => {
+    // Une page neuve evite qu'un reload HMR tardif de la baseline interrompe
+    // la navigation suivante sous WebKit.
+    const pageWithExtraScript = await context.newPage()
+    const extraScriptInterceptor = new IngestInterceptor(pageWithExtraScript)
+    await extraScriptInterceptor.attach()
+    await injectSnippet(pageWithExtraScript, "doomcheck")
+    await pageWithExtraScript.addInitScript(() => {
       const s = document.createElement("script")
       s.src = "/injected-test-only-script.js"
       ;(document.head || document.documentElement).appendChild(s)
     })
 
-    // Navigate to a different page — snippet re-boots and sees the extra script
-    interceptor.clear()
-    await page.goto("/catalog")
-    await page.waitForTimeout(2000)
-    await interceptor.triggerFlush()
+    await pageWithExtraScript.goto("/catalog")
+    await pageWithExtraScript.waitForTimeout(2000)
+    await extraScriptInterceptor.triggerFlush()
 
-    const hash2 = interceptor.getPageviews()[0].scripts_hash
+    const hash2 = extraScriptInterceptor.getPageviews()[0].scripts_hash
     expect(hash2).toBeTruthy()
     expect(
       hash2,
