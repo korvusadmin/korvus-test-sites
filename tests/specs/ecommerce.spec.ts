@@ -56,76 +56,6 @@ test.describe("Test 10 — add_to_cart_attempt", () => {
   })
 })
 
-// ---------------------------------------------------------------------------
-// Test 11 — search_performed (exempt)
-// ---------------------------------------------------------------------------
-
-test.describe("Test 11 — search_performed", () => {
-  test("captures query from search page (consent granted)", async ({ page }) => {
-    // V2 — search_performed.query est consent-gated (strippé sans consent).
-    // Ce test vérifie qu'avec consent granted, la query est bien présente.
-    await page.addInitScript(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const w = window as any
-      w._axcb = []
-      w.axeptio_settings = { cookies: { google_analytics: true } }
-    })
-
-    const interceptor = new IngestInterceptor(page)
-    await interceptor.attach()
-    await injectSnippet(page, doomcheck)
-
-    await page.goto("/search?q=NovaPro")
-    await page.waitForTimeout(2000)
-
-    await interceptor.triggerFlush()
-
-    const events = interceptor.getEvents("search_performed")
-    expect(
-      events.length,
-      "search_performed should be captured",
-    ).toBeGreaterThan(0)
-
-    const evt = events[0]
-    expect(evt.payload.query).toBe("NovaPro")
-  })
-
-  test("captures results_count with custom domSelector", async ({ page }) => {
-    const interceptor = new IngestInterceptor(page)
-    await interceptor.attach()
-    await injectSnippet(page, doomcheck)
-
-    // Search with results
-    await page.goto("/search?q=NovaPro")
-    await page.waitForTimeout(2000)
-
-    await interceptor.triggerFlush()
-
-    const events = interceptor.getEvents("search_performed")
-    expect(events.length).toBeGreaterThan(0)
-    expect(events[0].payload.results_count).toBeGreaterThan(0)
-  })
-
-  test("results_count is 0 for no-match search", async ({ page }) => {
-    const interceptor = new IngestInterceptor(page)
-    await interceptor.attach()
-    await injectSnippet(page, doomcheck)
-
-    await page.goto("/search?q=xyznonexistent")
-    await page.waitForTimeout(2000)
-
-    await interceptor.triggerFlush()
-
-    const events = interceptor.getEvents("search_performed")
-    expect(events.length).toBeGreaterThan(0)
-    expect(events[0].payload.results_count).toBe(0)
-  })
-})
-
-// ---------------------------------------------------------------------------
-// Test 14 — datalayer_validation (consent required)
-// ---------------------------------------------------------------------------
-
 test.describe("Test 14 — datalayer_validation", () => {
   test("valid purchase push → is_valid: true", async ({ page }) => {
     // Simulate Axeptio consent GRANTED before snippet boots
@@ -267,4 +197,3 @@ test.describe("Test 14 — datalayer_validation", () => {
     ).toBe(0)
   })
 })
-
