@@ -249,59 +249,6 @@ test.describe("ADH — tag_fired (fake pixels)", () => {
   })
 })
 
-// ---------------------------------------------------------------------------
-// search_performed (exempt)
-// ---------------------------------------------------------------------------
-
-test.describe("ADH — search_performed", () => {
-  test("search with results → results_count > 0", async ({ page }) => {
-    // V2 — search_performed structure (results_count) est exempt, mais
-    // search_performed.query est consent-gated. Ce test valide la partie
-    // exempt (results_count). La validation de query avec consent granted
-    // est couverte dans ecommerce.spec.ts Test 11.
-    // Page type "search" est auto-detecte via ?q= dans l URL ; le compteur
-    // est lu via la classe wrapper auto-reconnue ".search-results-count".
-    const interceptor = new IngestInterceptor(page)
-    await interceptor.attach()
-    await injectSnippet(page, adh)
-
-    await page.goto("/search?q=protein")
-    await page.waitForTimeout(2000)
-
-    await interceptor.triggerFlush()
-
-    const events = interceptor.getEvents("search_performed")
-    expect(events.length).toBeGreaterThan(0)
-    expect(events[0].payload.results_count).toBeGreaterThan(0)
-  })
-
-  test("search zero results → results_count = 0", async ({ page }) => {
-    const interceptor = new IngestInterceptor(page)
-    await interceptor.attach()
-    await injectSnippet(page, adh)
-
-    await page.goto("/search?q=xyzzznotfound")
-    await page.waitForTimeout(2000)
-
-    await interceptor.triggerFlush()
-
-    const events = interceptor.getEvents("search_performed")
-    expect(events.length).toBeGreaterThan(0)
-    expect(events[0].payload.results_count).toBe(0)
-  })
-})
-
-// ---------------------------------------------------------------------------
-// Happy path — session utilisateur réaliste chaînée
-// ---------------------------------------------------------------------------
-//
-// Parcours client complet sur athletedatahub avec consent granted :
-//  PDP  → ATC click → checkout → payment select → pay click → purchase push
-//
-// Vérifie que sur une session réaliste multi-étapes, la chaîne d'events v2
-// arrive bien bout en bout dans l'ordre attendu, sans dédup trop agressif
-// et avec le consent gating correct.
-
 test.describe("ADH — happy path chaîné v2", () => {
   test("PDP → ATC → checkout → payment → purchase : tous les events capturés", async ({
     page,

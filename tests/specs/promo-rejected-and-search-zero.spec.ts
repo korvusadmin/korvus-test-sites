@@ -2,15 +2,17 @@ import { test, expect, type Page } from "@playwright/test"
 import { IngestInterceptor } from "../helpers/ingest-interceptor"
 import { injectSnippet, getSiteConfig } from "../helpers/inject-snippet"
 
-// Vague 2 — Worker B4.4 — promo rejected + search zero results.
+// Vague 2 — Worker B4.4 — promo rejected.
 //
-// Deux fuites métier critiques regroupées :
-//   1. promo_code_rejected : le visiteur tape un code promo que le serveur
-//      rejette → fuite « promo cassé » qui démontre la perte de confiance
-//      à l'étape paiement (mauvaise config marketing OU code expiré).
-//   2. search_performed avec has_zero_results=true : recherche sans
-//      résultat → fuite catalogue. La query n'est dans le payload QUE si
-//      consent_status='granted' (cf. cnil-conformite.md).
+// promo_code_rejected : le visiteur tape un code promo que le serveur rejette
+// → fuite « promo cassé » qui démontre la perte de confiance à l'étape
+// paiement (mauvaise config marketing OU code expiré).
+//
+// Le second volet de ce fichier couvrait search_performed avec
+// has_zero_results. Le collector a été retiré le 2026-08-17 (ENG-62) : mesuré
+// sur 14 jours de production, has_zero_results n'était vrai 0 fois sur 24 446
+// événements, et aucune alerte search_no_results n'avait jamais été émise.
+// La Sentinelle V2 « Recherche interne » est enterrée avec lui.
 
 const doomcheck = getSiteConfig("doomcheck")
 
@@ -94,68 +96,3 @@ test.describe("Worker B4.4 — promo_attempted custom", () => {
   })
 })
 
-// ---------------------------------------------------------------------------
-// search_performed — has_zero_results
-// ---------------------------------------------------------------------------
-
-test.describe("Worker B4.4 — search_performed (zero results)", () => {
-  test("query 0 résultats avec consent granted → has_zero_results=true + query incluse", async ({
-    page,
-  }) => {
-    // Doomcheck a une page /search qui rend les résultats. Une query
-    // qui ne matche aucun produit → results_count=0.
-    // Page type "search" est auto-detecte via ?q= dans l URL ; le compteur
-    // est lu via la classe wrapper auto-reconnue ".search-results-count".
-    await simulateAxeptio(page, true)
-
-    const interceptor = new IngestInterceptor(page)
-    await interceptor.attach()
-    await injectSnippet(page, doomcheck)
-
-    await page.goto("/search?q=xyznonexistentquery")
-    await page.waitForTimeout(2000)
-
-    await interceptor.triggerFlush()
-
-    const events = interceptor.getEvents("search_performed")
-    expect(events.length, "search_performed devrait être émis").toBeGreaterThan(0)
-    const evt = events[0]
-    expect(evt.payload.results_count).toBe(0)
-    expect(evt.payload.has_zero_results).toBe(true)
-    // Avec consent granted, la query est incluse (sinon strippée à null).
-    expect(evt.payload.query).toBe("xyznonexistentquery")
-  })
-
-  test("query 0 résultats sans consent → has_zero_results=true mais query=null", async ({
-    page,
-  }) => {
-    // CNIL : la structure (results_count, has_zero_results) reste exempt,
-    // mais le texte de la query est strippé sans consent.
-    await simulateAxeptio(page, false)
-
-    const interceptor = new IngestInterceptor(page)
-    await interceptor.attach()
-    await injectSnippet(page, doomcheck)
-
-    await page.goto("/search?q=xyznonexistentquery")
-    await page.waitForTimeout(2000)
-
-    await interceptor.triggerFlush()
-
-    const events = interceptor.getEvents("search_performed")
-    expect(events.length).toBeGreaterThan(0)
-    const evt = events[0]
-    // Structure toujours captée.
-    expect(evt.payload.results_count).toBe(0)
-    expect(evt.payload.has_zero_results).toBe(true)
-    // Query strippée car consent != granted.
-    expect(evt.payload.query).toBeNull()
-
-    // Sanity check : la session a bien consent_status=denied (ou unknown
-    // selon la timing du callback Axeptio — l'important est que ce ne
-    // soit PAS granted).
-    const session = interceptor.getSession()
-    expect(session, "session payload should be present").toBeDefined()
-    expect(session!.consent_status).not.toBe("granted")
-  })
-})
