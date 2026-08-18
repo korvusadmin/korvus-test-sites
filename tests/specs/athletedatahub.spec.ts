@@ -752,7 +752,15 @@ test.describe("ADH — modes de demo", () => {
     const thumb = page.locator("a[href^='/products/'] img").first()
     await expect(thumb).toBeVisible()
     await expect(thumb).toHaveAttribute("src", /wetsuit\.png/)
-    expect(await thumb.evaluate((n: HTMLImageElement) => n.naturalWidth)).toBeGreaterThan(0)
+    // expect.poll et non un evaluate sec : `toBeVisible` dit que l'element est
+    // dans la page, pas que le navigateur a fini de DECODER l'image. Lire
+    // naturalWidth une seule fois juste apres, c'est une course -- perdue sur
+    // chromium le 2026-08-18, ce qui a bloque la release v1.25.0 pour une photo
+    // de combinaison. La lecture repetee garde l'intention du test (un src casse
+    // reste a 0 jusqu'au timeout) et supprime le hasard.
+    await expect
+      .poll(() => thumb.evaluate((n: HTMLImageElement) => n.naturalWidth))
+      .toBeGreaterThan(0)
   })
 
   test("?bug=promo : le code promo renvoie 500 et le message s'affiche", async ({
