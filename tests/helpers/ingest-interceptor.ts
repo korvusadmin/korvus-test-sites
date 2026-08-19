@@ -2,21 +2,30 @@ import type { Page, Route } from "@playwright/test"
 
 // --- Types mirrored from platform/snippet/src/types.ts (decoupled from snippet build) ---
 //
-// Audit 2026-04-15 (B4) — ce mirror avait dérivé sur plusieurs champs
-// (`client_batch_id` absent, pas de `created_at` sur session ni pageview —
-// audit B1). Conséquence : les specs qui lisaient les types via ce helper
-// n'avaient aucun moyen d'asserter sur le vrai contrat serveur.
+// Regle : ce miroir declare EXACTEMENT les memes noms de champs que les
+// interfaces homonymes de platform/snippet/src/types.ts. Un champ en trop
+// type ce que le snippet n'emet plus ; un champ en moins rend le champ
+// inassertable par les specs, donc invisible s'il casse.
 //
-// Règle : à chaque ajout d'un champ dans platform/snippet/src/types.ts qui
-// est consommable via les helpers de test, **mettre à jour ce mirror**. Le
-// sentinel grep `platform/tests/unit/snippet/ingest-interceptor-mirror.test.ts`
-// fail si `client_batch_id` / `created_at` disparaissent.
+// Les TYPES, eux, restent volontairement decouples : le miroir ne peut pas
+// importer les unions fermees du snippet (Platform, LoafSummary) sans se
+// recoupler au build. On reflete leur forme large.
+//
+// Le verrou est `platform/tests/unit/snippet/ingest-interceptor-mirror.test.ts`,
+// qui compare les deux jeux de champs. Il ne compare pas les types.
+//
+// ENG-242 (2026-08-19) : remise a niveau apres trois derives accumulees --
+// 8 champs product_* de PageviewPayload retires du snippet en v1.0.0 (drop
+// product cascade) mais restes ici, et 6 champs ajoutes cote snippet depuis
+// jamais reportes. Le verrou etait aveugle : il verifiait une liste en dur.
 
 export interface SessionPayload {
   id: string
   created_at: string
   website_id: string
   consent_status: "granted" | "denied" | "unknown"
+  // Provenance du statut de consentement, format `<detector>:<method>`.
+  consent_source?: string | null
   referrer_domain: string | null
   connection_type: string | null
   utm_source: string | null
@@ -30,6 +39,9 @@ export interface SessionPayload {
   has_adblocker: boolean | null
   pixels_loaded: string[]
   pixels_blocked: string[]
+  // Union fermee `Platform` cote snippet, reflete large ici (cf. en-tete).
+  platform?: string | null
+  snippet_version?: string | null
 }
 
 export interface PageviewPayload {
@@ -49,21 +61,17 @@ export interface PageviewPayload {
   cls_score?: number | null
   cls_largest_shift?: Record<string, unknown> | null
   resource_timings?: Record<string, unknown>[] | null
+  // `LoafSummary` cote snippet, reflete large ici (cf. en-tete).
+  loaf?: Record<string, unknown> | null
   scripts_hash?: string | null
-  // --- Produit (cascade snippet) ---
-  product_id?: string | null
-  product_id_source?: string | null
-  product_name?: string | null
-  product_name_source?: string | null
-  product_available?: boolean | null
-  product_available_source?: string | null
-  product_price_visible?: number | null
-  product_currency?: string | null
   // --- Page d'erreur ---
   is_error_page?: boolean | null
   http_status?: number | null
   // --- Navigation & engagement (Bloc 4) ---
   navigation_type?: string | null
+  // Pageview demarre onglet masque / prerender : Web Vitals aberrantes,
+  // exclues des agregats Lenteur cote platform.
+  started_hidden?: boolean | null
   visibility_time_ms?: number | null
   max_scroll_depth_pct?: number | null
   has_interacted?: boolean | null
@@ -71,6 +79,7 @@ export interface PageviewPayload {
   was_bfcache_restore?: boolean | null
   long_tasks_count?: number | null
   total_blocking_time_ms?: number | null
+  cache_age_seconds?: number | null
 }
 
 export interface EventPayload {
